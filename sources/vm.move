@@ -160,77 +160,112 @@ module vm::test_vm {
     use sui::coin::{Coin, Self, mint_for_testing as mint};
     use sui::test_scenario::{Self as test, next_tx, ctx};
 
+    use vm::vm::{Self, State};
+
     #[test]
     public fun test_transfer() {
         let sender = @0x1111;
-        let scenario = test::begin(&sender);
+        let scenario = &mut test::begin(&sender);
         let a = @0x000a;
         let b = @0x000b;
 
-        next_tx(&mut scenario, &sender); {
-            let coin = mint<SUI>(100, ctx(&mut scenario));
+        next_tx(scenario, &sender); {
+            let coin = mint<SUI>(100, ctx(scenario));
             sui::transfer(coin, sender);
         };
 
-        next_tx(&mut scenario, &sender); {
-            let coin = test::take_owned<Coin<SUI>>(&mut scenario);
+        next_tx(scenario, &sender); {
+            let coin = test::take_owned<Coin<SUI>>(scenario);
 
             let val = coin::value(&coin);
             assert!(val == 100, 0);
 
-            coin::split_and_transfer(&mut coin, 10, a, ctx(&mut scenario));
+            coin::split_and_transfer(&mut coin, 10, a, ctx(scenario));
             let val = coin::value(&coin);
             assert!(val == 90, 0);
 
-            test::return_owned(&mut scenario, coin);
+            test::return_owned(scenario, coin);
         };
-        next_tx(&mut scenario, &sender); {
-            let coin = test::take_owned<Coin<SUI>>(&mut scenario);
+        next_tx(scenario, &sender); {
+            let coin = test::take_owned<Coin<SUI>>(scenario);
 
             let val = coin::value(&coin);
             assert!(val == 90, 0);
 
-            test::return_owned(&mut scenario, coin);
+            test::return_owned(scenario, coin);
         };
 
-        next_tx(&mut scenario, &a); {
-            let coin = test::take_owned<Coin<SUI>>(&mut scenario);
+        next_tx(scenario, &a); {
+            let coin = test::take_owned<Coin<SUI>>(scenario);
 
             let val = coin::value(&coin);
             assert!(val == 10, 0);
 
-            coin::split_and_transfer(&mut coin, 1, b, ctx(&mut scenario));
+            coin::split_and_transfer(&mut coin, 1, b, ctx(scenario));
 
-            test::return_owned(&mut scenario, coin);
+            test::return_owned(scenario, coin);
         };
-        next_tx(&mut scenario, &a); {
-            let coin = test::take_owned<Coin<SUI>>(&mut scenario);
+        next_tx(scenario, &a); {
+            let coin = test::take_owned<Coin<SUI>>(scenario);
 
             let val = coin::value(&coin);
             assert!(val == 9, 0);
 
-            test::return_owned(&mut scenario, coin);
+            test::return_owned(scenario, coin);
         };
 
-        next_tx(&mut scenario, &b); {
-            let coin = test::take_owned<Coin<SUI>>(&mut scenario);
+        next_tx(scenario, &b); {
+            let coin = test::take_owned<Coin<SUI>>(scenario);
 
             let val = coin::value(&coin);
             assert!(val == 1, 0);
 
-            test::return_owned(&mut scenario, coin);
+            test::return_owned(scenario, coin);
         };
     }
 
-    // #[test]
-    // public fun test_basic() {
-    //     use sui::test_scenario;
+    #[test]
+    public fun test_basic() {
+        let sender = @0x1111;
+        let scenario = &mut test::begin(&sender);
 
-    //     use sui::tx_context;
-    //     use sui::transfer;
-    //     use sui::object::{Self};
+        next_tx(scenario, &sender); {
+            let coin = mint<SUI>(100, ctx(scenario));
+            sui::transfer(coin, sender);
+        };
 
-    //     // create a dummy TxContext for testing
-    //     let ctx = tx_context::dummy();
-    // }
+        next_tx(scenario, &sender); {
+            vm::create(ctx(scenario));
+        };
+
+        next_tx(scenario, &sender); {
+            let wrapper = test::take_shared<State>(scenario);
+            let state = test::borrow_mut(&mut wrapper);
+
+            let amount = 10;
+            let coin = test::take_owned<Coin<SUI>>(scenario);
+            coin::split(&mut coin, amount, ctx(scenario));
+
+            let addr_evm = x"111157839b00206d1ad20c69a1981b4811111111";
+
+            vm::deposit(state, addr_evm, coin);
+            let balance = vm::pool_balance(state);
+            assert!(balance == 90, 0);
+
+            // let acct = vm::account(state, &addr_evm);
+            // assert!(acct.balance == 90, 0);
+            // assert!(acct.nonce == 0, 0);
+
+            test::return_shared(scenario, wrapper);
+        };
+
+        next_tx(scenario, &sender); {
+            let coin = test::take_owned<Coin<SUI>>(scenario);
+
+            let val = coin::value(&coin);
+            assert!(val == 10, 0);
+
+            test::return_owned(scenario, coin);
+        };
+    }
 }
