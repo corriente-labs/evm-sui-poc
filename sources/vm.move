@@ -125,7 +125,7 @@ module vm::vm {
         }
     }
 
-    public entry fun transfer(_state: &mut StateV1, nonce: u128, from: vector<u8>, to: vector<u8>, amount: u64) {
+    public fun transfer(_state: &mut StateV1, nonce: u128, from: vector<u8>, to: vector<u8>, amount: u64) {
         let state = state_mut(_state);
         let accounts = state::accounts_mut(state);
         let from_acct = vec_map::get_mut(accounts, &from);
@@ -150,7 +150,7 @@ module vm::vm {
         }
     }
 
-    public entry fun call(_state: &State, nonce: u128, from: vector<u8>, to: vector<u8>, amount: u128, data: vector<u8>) {
+    public fun call(_state: &State, nonce: u128, from: vector<u8>, to: vector<u8>, amount: u128, data: vector<u8>) {
         let _ = nonce;
         let _ = from;
         let _ = to;
