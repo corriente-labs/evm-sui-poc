@@ -142,6 +142,7 @@ module vm::vm {
 
         if (vec_map::contains(accounts, &to)) {
             let to_acct = vec_map::get_mut(accounts, &to);
+            let current_balance = account::balance(to_acct);
             account::set_balance(to_acct, current_balance + amount);
         } else {
             let to_acct = account::create(to, amount, 0, vector::empty());
@@ -328,12 +329,12 @@ module vm::test_vm {
             assert!(balance == 909, 0);
 
             let acct = vm::account(state_v1, &a_evm);
-            assert!(account::nonce(acct) == 2, 0);
             assert!(account::balance(acct) == 899, 0);
+            assert!(account::nonce(acct) == 2, 0);
 
             let acct = vm::account(state_v1, &b_evm);
-            assert!(account::nonce(acct) == 1, 0);
             assert!(account::balance(acct) == 10, 0);
+            assert!(account::nonce(acct) == 1, 0);
 
             test::return_shared(scenario, wrapper);
         };
