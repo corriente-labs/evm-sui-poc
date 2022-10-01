@@ -1,6 +1,6 @@
 module vm::vm {
     use sui::object::{Self, UID};
-    use sui::vec_map::{Self, VecMap};
+    use sui::vec_map::{Self};
     use sui::tx_context::TxContext;
     use sui::sui::{SUI};
     use sui::coin::{Coin, Self};
@@ -8,32 +8,23 @@ module vm::vm {
     use sui::transfer;
     use std::vector;
 
+    use vm::state::{State, Self};
+    use vm::account::{Account, Self};
+
     const EAmountInvalid: u64 = 0;
     const ENonceInvalid: u64 = 1;
     const EToInvalid: u64 = 2;
 
-    struct Account has store {
-        addr: vector<u8>,
-        balance: u64,
-        nonce: u128,
-        code: vector<u8>,
-    }
-
-    public fun acct_balance(acct: &Account): u64 {
-        acct.balance
-    }
-    public fun acct_nonce(acct: &Account): u128 {
-        acct.nonce
-    }
-    public fun acct_code(acct: &Account): vector<u8> {
-        acct.code
-    }
-    
-    struct State has key, store {
+    // state wrapper
+    struct StateV1 has key, store {
         id: UID,
-        accounts: VecMap<vector<u8>, Account>,
-        height: u128,
-        pool: Coin<SUI>,
+        state: State,
+    }
+    public fun state(state: &StateV1): &State {
+        &state.state
+    }
+    fun state_mut(state: &mut StateV1): &mut State {
+        &mut state.state
     }
 
     struct GetAccount has copy, drop {
@@ -49,105 +40,112 @@ module vm::vm {
     }
 
     public entry fun create(ctx: &mut TxContext) {
-        let state = State {
+        let state = state::create(ctx);
+        let stateV1 = StateV1 {
             id: object::new(ctx),
-            accounts: vec_map::empty(),
-            height: 0,
-            pool: coin::zero(ctx),
+            state: state,
         };
-        transfer::share_object(state);
+        transfer::share_object(stateV1);
     }
 
-    public fun pool_balance(_state: &State): u64 {
-        let val = coin::value(&_state.pool);
+    public fun pool_balance(_state: &StateV1): u64 {
+        let state = state(_state);
+        let pool = state::pool(state);
+        let val = coin::value(pool);
         val
     }
 
-    public entry fun get_account(_state: &State, addr: vector<u8>) {
-        let acct = vec_map::get(&_state.accounts, &addr);
+    public entry fun get_account(_state: &StateV1, addr: vector<u8>) {
+        let state = state(_state);
+        let accounts = state::accounts(state);
+        let acct = vec_map::get(accounts, &addr);
         event::emit(GetAccount {
-            addr: acct.addr,
-            balance: acct.balance,
-            nonce: acct.nonce,
-            code: acct.code,
+            addr: account::addr(acct),
+            balance: account::balance(acct),
+            nonce: account::nonce(acct),
+            code: account::code(acct),
         });
     }
 
-    public fun account(_state: &State, addr: &vector<u8>): &Account {
-        let acct = vec_map::get(&_state.accounts, addr);
+    public fun account(_state: &StateV1, addr: &vector<u8>): &Account {
+        let state = state(_state);
+        let accounts = state::accounts(state);
+        let acct = vec_map::get(accounts, addr);
         acct
     }
 
-    public fun deposit(_state: &mut State, addr: vector<u8>, coin: Coin<SUI>) {
+    public fun deposit(_state: &mut StateV1, addr: vector<u8>, coin: Coin<SUI>) {
         let val = coin::value(&coin);
-        if (vec_map::contains(&_state.accounts, &addr)) {
-            let acct = vec_map::get_mut(&mut _state.accounts, &addr);
-            acct.balance = val;
-            acct.nonce = 0;
-            acct.code = vector::empty();
+
+        let state = state_mut(_state);
+        let accounts = state::accounts_mut(state);
+        if (vec_map::contains(accounts, &addr)) {
+            let acct = vec_map::get_mut(accounts, &addr);
+            let current_balance = account::balance(acct);
+            account::set_balance(acct, current_balance + val);
         } else {
-            let acct = Account {
-                addr: addr,
-                balance: val,
-                nonce: 0,
-                code: vector::empty(),
-            };
-            vec_map::insert(&mut _state.accounts, addr, acct);
+            let acct = account::create(addr, val, 0, vector::empty());
+            vec_map::insert(accounts, addr, acct);
         };
 
-        coin::join(&mut _state.pool, coin);
+        let pool = state::pool_mut(state);
+        coin::join(pool, coin);
     }
 
-    public fun withdraw(_state: &mut State, nonce: u128, from: vector<u8>, amount: u64, ctx: &mut TxContext): Coin<SUI> {
-        let acct = vec_map::get_mut(&mut _state.accounts, &from);
-        assert!(acct.nonce == nonce, ENonceInvalid);
-        assert!(acct.balance >= amount, EAmountInvalid);
+    public fun withdraw(_state: &mut StateV1, nonce: u128, from: vector<u8>, amount: u64, ctx: &mut TxContext): Coin<SUI> {
+        let state = state_mut(_state);
+        let accounts = state::accounts_mut(state);
+        let acct = vec_map::get_mut(accounts, &from);
         
-        acct.balance = acct.balance - amount;
-        acct.nonce = acct.nonce + 1;
+        let current_nonce = account::nonce(acct);
+        assert!(current_nonce == nonce, ENonceInvalid);
+        account::nonce_increment(acct);
 
-        coin::take(coin::balance_mut(&mut _state.pool), amount, ctx)
+        let current_balance = account::balance(acct);
+        assert!(current_balance >= amount, EAmountInvalid);
+        account::set_balance(acct, current_balance - amount);
+
+        let pool = state::pool_mut(state);
+        coin::take(coin::balance_mut(pool), amount, ctx)
     }
 
     #[test_only]
-    public entry fun edit_account(_state: &mut State, addr: vector<u8>, nonce: u128, balance: u64, code: vector<u8>) {
-        if (vec_map::contains(&_state.accounts, &addr)) {
-            let acct = vec_map::get_mut(&mut _state.accounts, &addr);
-            acct.balance = balance;
-            acct.nonce = nonce;
-            acct.code = code;
+    public entry fun edit_account(_state: &mut StateV1, addr: vector<u8>, nonce: u128, balance: u64, code: vector<u8>) {
+        let state = state_mut(_state);
+        let accounts = state::accounts_mut(state);
+
+        if (vec_map::contains(accounts, &addr)) {
+            let acct = vec_map::get_mut(accounts, &addr);
+            account::set_balance(acct, balance);
+            account::set_nonce(acct, nonce);
+            account::set_code(acct, code);
         } else {
-            let acct = Account {
-                addr: addr,
-                balance: balance,
-                nonce: nonce,
-                code: code,
-            };
-            vec_map::insert(&mut _state.accounts, addr, acct);
+            let acct = account::create(addr, balance, nonce, code);
+            vec_map::insert(accounts, addr, acct);
         }
     }
 
-    public entry fun transfer(_state: &mut State, nonce: u128, from: vector<u8>, to: vector<u8>, amount: u64) {
-        let acct = vec_map::get_mut(&mut _state.accounts, &from);
+    public entry fun transfer(_state: &mut StateV1, nonce: u128, from: vector<u8>, to: vector<u8>, amount: u64) {
+        let state = state_mut(_state);
+        let accounts = state::accounts_mut(state);
+        let from_acct = vec_map::get_mut(accounts, &from);
 
-        assert!(acct.balance > amount, EAmountInvalid);
-        assert!(acct.nonce == nonce, ENonceInvalid);
         assert!(vector::length(&to) == 20, EToInvalid);
 
-        acct.balance = acct.balance - amount;
-        acct.nonce = nonce + 1;
+        let current_nonce = account::nonce(from_acct);
+        assert!(current_nonce == nonce, ENonceInvalid);
+        account::nonce_increment(from_acct);
 
-        if (vec_map::contains(&_state.accounts, &to)) {
-            let to_acct = vec_map::get_mut(&mut _state.accounts, &to);
-            to_acct.balance = to_acct.balance + amount;
+        let current_balance = account::balance(from_acct);
+        assert!(current_balance >= amount, EAmountInvalid);
+        account::set_balance(from_acct, current_balance - amount);
+
+        if (vec_map::contains(accounts, &to)) {
+            let to_acct = vec_map::get_mut(accounts, &to);
+            account::set_balance(to_acct, current_balance + amount);
         } else {
-            let to_acct = Account {
-                addr: to,
-                balance: amount,
-                nonce: 0,
-                code: vector::empty(),
-            };
-            vec_map::insert(&mut _state.accounts, to, to_acct);
+            let to_acct = account::create(to, amount, 0, vector::empty());
+            vec_map::insert(accounts, to, to_acct);
         }
     }
 
@@ -170,7 +168,9 @@ module vm::test_vm {
     use sui::coin::{Coin, Self, mint_for_testing as mint};
     use sui::test_scenario::{Self as test, next_tx, ctx};
 
-    use vm::vm::{Self, State};
+    use vm::vm::{Self, StateV1};
+    use vm::state::{Self};
+    use vm::account::{Self};
 
     #[test]
     public fun test_transfer() {
@@ -235,7 +235,7 @@ module vm::test_vm {
     }
 
     #[test]
-    public fun test_basic() {
+    public fun test_deposit_transfer_withdraw() {
         let sender = @0x1111;
         let scenario = &mut test::begin(&sender);
 
@@ -256,7 +256,7 @@ module vm::test_vm {
 
         // a deposits 900
         next_tx(scenario, &a); {
-            let wrapper = test::take_shared<State>(scenario);
+            let wrapper = test::take_shared<StateV1>(scenario);
             let state = test::borrow_mut(&mut wrapper);
 
             let amount = 100;
@@ -268,8 +268,8 @@ module vm::test_vm {
             assert!(balance == 900, 0);
 
             let acct = vm::account(state, &a_evm);
-            assert!(vm::acct_balance(acct) == 900, 0);
-            assert!(vm::acct_nonce(acct) == 0, 0);
+            assert!(account::balance(acct) == 900, 0);
+            assert!(account::nonce(acct) == 0, 0);
 
             test::return_shared(scenario, wrapper);
         };
@@ -290,8 +290,8 @@ module vm::test_vm {
 
         // b deposits 9
         next_tx(scenario, &b); {
-            let wrapper = test::take_shared<State>(scenario);
-            let state = test::borrow_mut(&mut wrapper);
+            let wrapper = test::take_shared<StateV1>(scenario);
+            let state_v1 = test::borrow_mut(&mut wrapper);
 
             let coin = test::take_owned<Coin<SUI>>(scenario);
             let val = coin::value(&coin);
@@ -300,63 +300,63 @@ module vm::test_vm {
             let amount = 1;
             coin::split(&mut coin, amount, ctx(scenario));
 
-            vm::deposit(state, b_evm, coin);
-            let balance = vm::pool_balance(state);
+            vm::deposit(state_v1, b_evm, coin);
+            let balance = state::pool_balance(vm::state(state_v1));
             assert!(balance == 909, 0);
 
-            let acct = vm::account(state, &a_evm);
-            assert!(vm::acct_balance(acct) == 900, 0);
-            assert!(vm::acct_nonce(acct) == 0, 0);
+            let acct = vm::account(state_v1, &a_evm);
+            assert!(account::balance(acct) == 900, 0);
+            assert!(account::nonce(acct) == 0, 0);
 
-            let acct = vm::account(state, &b_evm);
-            assert!(vm::acct_balance(acct) == 9, 0);
-            assert!(vm::acct_nonce(acct) == 0, 0);
+            let acct = vm::account(state_v1, &b_evm);
+            assert!(account::balance(acct) == 9, 0);
+            assert!(account::nonce(acct) == 0, 0);
 
             test::return_shared(scenario, wrapper);
         };
 
         // transfer
         next_tx(scenario, &a); {
-            let wrapper = test::take_shared<State>(scenario);
-            let state = test::borrow_mut(&mut wrapper);
+            let wrapper = test::take_shared<StateV1>(scenario);
+            let state_v1 = test::borrow_mut(&mut wrapper);
 
-            vm::transfer(state, 0, a_evm, b_evm, 1);
-            vm::transfer(state, 1, a_evm, b_evm, 1);
-            vm::transfer(state, 0, b_evm, a_evm, 1);
+            vm::transfer(state_v1, 0, a_evm, b_evm, 1);
+            vm::transfer(state_v1, 1, a_evm, b_evm, 1);
+            vm::transfer(state_v1, 0, b_evm, a_evm, 1);
 
-            let balance = vm::pool_balance(state);
+            let balance = vm::pool_balance(state_v1);
             assert!(balance == 909, 0);
 
-            let acct = vm::account(state, &a_evm);
-            assert!(vm::acct_balance(acct) == 899, 0);
-            assert!(vm::acct_nonce(acct) == 2, 0);
+            let acct = vm::account(state_v1, &a_evm);
+            assert!(account::nonce(acct) == 2, 0);
+            assert!(account::balance(acct) == 899, 0);
 
-            let acct = vm::account(state, &b_evm);
-            assert!(vm::acct_balance(acct) == 10, 0);
-            assert!(vm::acct_nonce(acct) == 1, 0);
+            let acct = vm::account(state_v1, &b_evm);
+            assert!(account::nonce(acct) == 1, 0);
+            assert!(account::balance(acct) == 10, 0);
 
             test::return_shared(scenario, wrapper);
         };
 
         // a withdraws 100
         next_tx(scenario, &a); {
-            let wrapper = test::take_shared<State>(scenario);
-            let state = test::borrow_mut(&mut wrapper);
+            let wrapper = test::take_shared<StateV1>(scenario);
+            let state_v1 = test::borrow_mut(&mut wrapper);
 
-            let coin_withdrawn = vm::withdraw(state, 2, a_evm, 100, ctx(scenario));
+            let coin_withdrawn = vm::withdraw(state_v1, 2, a_evm, 100, ctx(scenario));
             let val = coin::value(&coin_withdrawn);
             assert!(val == 100, 0);
 
-            let balance = vm::pool_balance(state);
+            let balance = vm::pool_balance(state_v1);
             assert!(balance == 809, 0);
 
-            let acct = vm::account(state, &a_evm);
-            assert!(vm::acct_balance(acct) == 799, 0);
-            assert!(vm::acct_nonce(acct) == 3, 0);
+            let acct = vm::account(state_v1, &a_evm);
+            assert!(account::balance(acct) == 799, 0);
+            assert!(account::nonce(acct) == 3, 0);
 
-            let acct = vm::account(state, &b_evm);
-            assert!(vm::acct_balance(acct) == 10, 0);
-            assert!(vm::acct_nonce(acct) == 1, 0);
+            let acct = vm::account(state_v1, &b_evm);
+            assert!(account::balance(acct) == 10, 0);
+            assert!(account::nonce(acct) == 1, 0);
 
             let coin = test::take_owned<Coin<SUI>>(scenario);
             coin::join(&mut coin, coin_withdrawn);
