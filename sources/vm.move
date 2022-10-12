@@ -1,5 +1,5 @@
 module vm::vm {
-    use sui::object::{Self, UID};
+    use sui::object::{Self, UID, uid_to_address};
     use sui::vec_map::{Self};
     use sui::tx_context::TxContext;
     use sui::sui::{SUI};
@@ -27,6 +27,10 @@ module vm::vm {
         &mut state.state
     }
 
+    struct Init has copy, drop {
+        state_addr: address
+    }
+
     struct GetAccount has copy, drop {
         addr: vector<u8>,
         balance: u64,
@@ -36,16 +40,21 @@ module vm::vm {
 
     struct CallResult has copy, drop {
         status: u128,
+        state_addr: address,
         data: vector<u8>,
     }
 
     public entry fun create(ctx: &mut TxContext) {
         let state = state::create(ctx);
-        let stateV1 = StateV1 {
+        let state_v1 = StateV1 {
             id: object::new(ctx),
             state: state,
         };
-        transfer::share_object(stateV1);
+        let state_addr = uid_to_address(&state_v1.id);
+        transfer::share_object(state_v1);
+        event::emit(Init {
+            state_addr: state_addr,
+        });
     }
 
     public fun pool_balance(_state: &StateV1): u64 {
@@ -125,6 +134,14 @@ module vm::vm {
         }
     }
 
+    public entry fun call(_state: &StateV1, tx: vector<u8>) {
+        event::emit(CallResult{
+            status: 0,
+            state_addr: uid_to_address(&_state.id),
+            data: tx,
+        })
+    }
+
     public fun transfer(_state: &mut StateV1, nonce: u128, from: vector<u8>, to: vector<u8>, amount: u64) {
         let state = state_mut(_state);
         let accounts = state::accounts_mut(state);
@@ -150,17 +167,18 @@ module vm::vm {
         }
     }
 
-    public fun call(_state: &State, nonce: u128, from: vector<u8>, to: vector<u8>, amount: u128, data: vector<u8>) {
-        let _ = nonce;
-        let _ = from;
-        let _ = to;
-        let _ = amount;
-        let _ = data;
-        event::emit(CallResult{
-            status: 0,
-            data: vector::empty(),
-        })
-    }
+    // public fun call(_state: &StateV1, nonce: u128, from: vector<u8>, to: vector<u8>, amount: u128, data: vector<u8>) {
+    //     let _ = nonce;
+    //     let _ = from;
+    //     let _ = to;
+    //     let _ = amount;
+    //     let _ = data;
+    //     event::emit(CallResult{
+    //         status: 0,
+    //         state_addr: uid_to_address(&_state.id),
+    //         data: vector::empty(),
+    //     })
+    // }
 }
 
 #[test_only]
