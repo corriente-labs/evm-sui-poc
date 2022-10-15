@@ -64,7 +64,7 @@ sequenceDiagram
         Note right of Payer: [Transaction]<br/>from = PayerAddress<br/>to = EvmInterpreter<br/>amount = 0<br/>gas_price = gP<br/>max_gas_amount = gL_call<br/>[Call Arguments]<br/>from: alice<br/>to: bob<br/>value=v<br/>calldata = d<br/>nonce = n<br/>signature = sig
         Payer->>Payer: Sign Sui Transaction with ' s '
         Payer->>EVM: Sui Call 
-        Note right of EVM: [Execution]<br/>check signature<br>interpret EVM transaction
+        Note right of EVM: [Execution]<br/>check signature<br>subtract intrinsic fee from alice's EVM account<br/>interpret EVM transaction
         EVM-->>Payer: Sui Response ' r '
     end
     Note over Payer, EVM: END ExecuteEvmTx
