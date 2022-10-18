@@ -196,6 +196,59 @@ Mutated Objects:
   - ID: 0x493116f6f43be2d1309ec744e0761af7f7fe7aec , Owner: Shared
   - ID: 0x6c320f11da70f65d2a05f51968ca1c86ea2816b0 , Owner: Account Address ( 0x128f64b1855c9546a7ae27318241796e1edb722a )
 ```
+
+### call EVM via RPC
+- start RPC server: https://docs.sui.io/devnet/build/json-rpc#start-rpc-server
+- moveCall: https://docs.sui.io/sui-jsonrpc#sui_moveCall
+- sui json: https://docs.sui.io/build/sui-json#type-coercion-rules
+```
+curl http://localhost:5001 -X POST -H "Content-Type: application/json" -d '{"jsonrpc": "2.0", "id": 1, "method": "sui_moveCall", "params": ["0x128f64b1855c9546a7ae27318241796e1edb722a", "0xe0a854a72ebc77fcb532de742455e050fdd1166b", "vm", "call", [], ["0x493116f6f43be2d1309ec744e0761af7f7fe7aec", "hello vm"], "0x6c320f11da70f65d2a05f51968ca1c86ea2816b0", 1000]}'
+```
+> to get gas object: run `sui client gas`
+#### response
+```json
+{
+    "jsonrpc": "2.0",
+    "result": {
+        "txBytes": "VHJhbnNhY3Rpb25EYXRhOjoAAuCoVKcuvHf8tTLedCRV4FD90RZrAQAAAAAAAAAg9Dy3UE7rHsR+3Ge/g1x7eJD0S5vhZctUIPNZgqs92W8Cdm0EY2FsbAACAQFJMRb29Dvi0TCex0Tgdhr39/567AAJCGhlbGxvIHZtEo9ksYVclUanricxgkF5bh7bcipsMg8R2nD2XSoF9RloyhyG6igWsAcAAAAAAAAAIEhyBGgoT5TgHVxRNcfti7/Y4bQr05tm6w6P4iciY7I1AQAAAAAAAADoAwAAAAAAAA==",
+        "gas": {
+            "objectId": "0x6c320f11da70f65d2a05f51968ca1c86ea2816b0",
+            "version": 7,
+            "digest": "SHIEaChPlOAdXFE1x+2Lv9jhtCvTm2brDo/iJyJjsjU="
+        },
+        "inputObjects": [
+            {
+                "SharedMoveObject": "0x493116f6f43be2d1309ec744e0761af7f7fe7aec"
+            },
+            {
+                "MovePackage": "0xe0a854a72ebc77fcb532de742455e050fdd1166b"
+            },
+            {
+                "ImmOrOwnedMoveObject": {
+                    "objectId": "0x6c320f11da70f65d2a05f51968ca1c86ea2816b0",
+                    "version": 7,
+                    "digest": "SHIEaChPlOAdXFE1x+2Lv9jhtCvTm2brDo/iJyJjsjU="
+                }
+            }
+        ]
+    },
+    "id": 1
+}
+```
+
+### dry run transaction
+- https://docs.sui.io/sui-jsonrpc#sui_dryRunTransaction
+```
+curl http://localhost:5001 -X POST -H "Content-Type: application/json" -d '{"jsonrpc": "2.0", "id": 1, "method": "sui_dryRunTransaction", "params": ["VHJhbnNhY3Rpb25EYXRhOjoAAuCoVKcuvHf8tTLedCRV4FD90RZrAQAAAAAAAAAg9Dy3UE7rHsR+3Ge/g1x7eJD0S5vhZctUIPNZgqs92W8Cdm0EY2FsbAACAQFJMRb29Dvi0TCex0Tgdhr39/567AAJCGhlbGxvIHZtEo9ksYVclUanricxgkF5bh7bcipsMg8R2nD2XSoF9RloyhyG6igWsAcAAAAAAAAAIEhyBGgoT5TgHVxRNcfti7/Y4bQr05tm6w6P4iciY7I1AQAAAAAAAADoAwAAAAAAAA==", "ED25519", "0Pu2s/M1xPeMArRmsLnIosKcqi9BWDFUJp6IVUHEtJlz7vp2wAv227n5gNn059Vm7FUfYs36P5eHrQ6IaW57BQ==", "TtVsIwfMrPRmPcB8vYp3LFHv5Sp3AD9IBtpBJpK8mQ0="}'
+```
+failing
+```
+{"jsonrpc":"2.0","error":{"code":-32700,"message":"Parse error"},"id":null}
+```
+### dry run call
+- https://github.com/MystenLabs/sui/issues/4967
+
+
 ## Web3 API
 https://ethereum.org/en/developers/docs/apis/json-rpc/
 eth_getBlockByHash
