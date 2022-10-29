@@ -5,6 +5,10 @@ https://docs.sui.io/devnet/build/cli-client#genesis
 ```
 sui genesis
 ```
+### start local net
+```
+sui start
+```
 ### show addresses
 ```
 $ sui client addresses
