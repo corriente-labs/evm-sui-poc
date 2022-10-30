@@ -39,6 +39,8 @@
 ///     * Could be improved with div_mod_small (current version probably would took a lot of resources for small numbers).
 ///     * Also could be improved with Knuth, TAOCP, Volume 2, section 4.3.1, Algorithm D (see link to Parity above).
 module vm::u256 {
+    use std::vector;
+
     // Errors.
     /// When can't cast `U256` to `u128` (e.g. number too large).
     const ECAST_OVERFLOW: u64 = 0;
@@ -147,11 +149,49 @@ module vm::u256 {
     }
 
     public fun to_vec(a: &U256): vector<u8> {
-
+        let ret: vector<u8> = vector::empty();
+        u64_to_vec(&mut ret, a.v3);
+        u64_to_vec(&mut ret, a.v2);
+        u64_to_vec(&mut ret, a.v1);
+        u64_to_vec(&mut ret, a.v0);
+        ret
     }
 
-    public fun from_vec(vec: vector<u8>): U256 {
-        
+    public fun from_vec(vec: &vector<u8>): U256 {
+        let v3 = vec_to_u64(vec, 24, 8);
+        let v2 = vec_to_u64(vec, 16, 8);
+        let v1 = vec_to_u64(vec, 8, 8);
+        let v0 = vec_to_u64(vec, 0, 8);
+        U256 {
+            v0,
+            v1,
+            v2,
+            v3
+        }
+    }
+
+    fun u64_to_vec(vec: &mut vector<u8>, a: u64) {
+        let i = 7;
+        while (i >= 0) {
+            let byte = ((a >> i) as u8);
+            vector::push_back(vec, byte);
+            i = i - 1;
+        };
+    }
+
+    fun vec_to_u64(vec: &vector<u8>, offset: u64, size: u64): u64 {
+        let ret: u64 = 0;
+        assert!(size <= 8, 0);
+
+        let i = 0;
+        while(i < size) {
+            let byte = *vector::borrow(vec, offset + size - i);
+            let byte: u64 = (byte as u64);
+            let byte = byte << (8*(i as u8));
+            ret = ret + byte;
+            i = i + 1;
+        };
+        ret
     }
 
     // Public functions.
@@ -629,6 +669,42 @@ module vm::u256 {
     }
 
     // Tests.
+    #[test]
+    fun test_to_vec() {
+        let a = U256 {
+            v0: 18446744073709551615,
+            v1: 18446744073709551615,
+            v2: 18446744073709551615,
+            v3: 18446744073709551615,
+        };
+
+        let vec = to_vec(&a);
+
+        assert!(vector::length(&vec) == 32, 0);
+        let i = 0;
+        while(i < 32) {
+            let byte = vector::borrow(&vec, i);
+            assert!(byte == 0xff, 0);
+            i = i + 1;
+        };
+    }
+
+    #[test]
+    fun test_from_vec() {
+        let vec = vector::empty();
+        let i = 0;
+        while(i < 32) {
+            let byte = vector::push_back(&mut vec, 0xff);
+            i = i + 1;
+        };
+
+        let a = from_vec(&vec);
+        assert!(a.v0 == 0xff, 0);
+        assert!(a.v1 == 0xff, 0);
+        assert!(a.v2 == 0xff, 0);
+        assert!(a.v3 == 0xff, 0);
+    }
+
     #[test]
     fun test_get_d() {
         let a = DU256 {

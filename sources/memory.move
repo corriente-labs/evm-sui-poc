@@ -17,15 +17,19 @@ module vm::memory {
     }
 
     public fun mload(mem: &mut Memory, offset: U256): U256 {
-
+        let _ = mem;
+        let _ = offset;
+        u256::zero()
     }
 
     public fun mstore(mem: &mut Memory, offset: U256, val: U256) {
-
+        let _ = mem;
+        let _ = offset;
+        let _ = val;
     }
 
     public fun msize(mem: &Memory): U256 {
         let len: u64 = (vector::length(&mem.data) as u64);
-        len
+        u256::from_u64(len)
     }
 }
