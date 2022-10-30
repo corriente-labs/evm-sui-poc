@@ -95,47 +95,7 @@ module vm::u256 {
         v7: u64,
     }
 
-    // Public functions.
-    /// Adds two `U256` and returns sum.
-    public fun add(a: U256, b: U256): U256 {
-        let ret = zero();
-        let carry = 0u64;
-
-        let i = 0;
-        while (i < WORDS) {
-            let a1 = get(&a, i);
-            let b1 = get(&b, i);
-
-            if (carry != 0) {
-                let (res1, is_overflow1) = overflowing_add(a1, b1);
-                let (res2, is_overflow2) = overflowing_add(res1, carry);
-                put(&mut ret, i, res2);
-
-                carry = 0;
-                if (is_overflow1) {
-                    carry = carry + 1;
-                };
-
-                if (is_overflow2) {
-                    carry = carry + 1;
-                }
-            } else {
-                let (res, is_overflow) = overflowing_add(a1, b1);
-                put(&mut ret, i, res);
-
-                carry = 0;
-                if (is_overflow) {
-                    carry = 1;
-                };
-            };
-
-            i = i + 1;
-        };
-
-        assert!(carry == 0, EOVERFLOW);
-
-        ret
-    }
+    
 
     /// Convert `U256` to `u128` value if possible (otherwise it aborts).
     public fun as_u128(a: U256): u128 {
@@ -185,6 +145,55 @@ module vm::u256 {
             v3: 0,
         }
     }
+
+    public fun to_vec(a: &U256): vector<u8> {
+
+    }
+
+    public fun from_vec(vec: vector<u8>): U256 {
+        
+    }
+
+    // Public functions.
+    /// Adds two `U256` and returns sum.
+    public fun add(a: U256, b: U256): U256 {
+        let ret = zero();
+        let carry = 0u64;
+
+        let i = 0;
+        while (i < WORDS) {
+            let a1 = get(&a, i);
+            let b1 = get(&b, i);
+
+            if (carry != 0) {
+                let (res1, is_overflow1) = overflowing_add(a1, b1);
+                let (res2, is_overflow2) = overflowing_add(res1, carry);
+                put(&mut ret, i, res2);
+
+                carry = 0;
+                if (is_overflow1) {
+                    carry = carry + 1;
+                };
+
+                if (is_overflow2) {
+                    carry = carry + 1;
+                }
+            } else {
+                let (res, is_overflow) = overflowing_add(a1, b1);
+                put(&mut ret, i, res);
+
+                carry = 0;
+                if (is_overflow) {
+                    carry = 1;
+                };
+            };
+
+            i = i + 1;
+        };
+
+        ret
+    }
+
 
     /// Multiples two `U256`.
     public fun mul(a: U256, b: U256): U256 {
@@ -243,8 +252,7 @@ module vm::u256 {
             i = i + 1;
         };
 
-        let (r, overflow) = du256_to_u256(ret);
-        assert!(!overflow, EOVERFLOW);
+        let (r, _overflow) = du256_to_u256(ret);
         r
     }
 
@@ -285,7 +293,6 @@ module vm::u256 {
             i = i + 1;
         };
 
-        assert!(carry == 0, EOVERFLOW);
         ret
     }
 
