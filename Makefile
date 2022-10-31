@@ -22,6 +22,10 @@ start-local:
 stop-local:
 	pkill sui || true
 
+.PHONY: publish-local
+publish-local:
+	sui client --client.config $(LOCAL_NET_CONFIG_LOCATION)/client.yaml publish --path ./ --gas-budget 30000 
+
 .PHONY: start-rpc
 start-rpc:
 	rpc-server
