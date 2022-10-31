@@ -3,11 +3,11 @@
 ## Test on Local network
 https://docs.sui.io/devnet/build/cli-client#genesis
 ```
-sui genesis
+make init-local
 ```
 ### start local net
 ```
-sui start
+make start-local
 ```
 ### show addresses
 ```
@@ -90,12 +90,12 @@ $ sui client gas
  0xcf1438d8f4fc26906cef10ca596c837f99c95a66 |  100000000
 ```
 
-## Publishing EVM package
+## Publishing EVM package to local net
 https://docs.sui.io/devnet/build/cli-client#publish-packages
 
 Execute the following command in the directory where `Move.toml` file is located.
 ```
-sui client publish --path ./ --gas-budget 30000
+make publish-local
 ```
 ```
 ----- Certificate ----
@@ -240,6 +240,9 @@ curl http://localhost:5001 -X POST -H "Content-Type: application/json" -d '{"jso
 **Not supported yet?**
 
 ### call EVM via RPC
+```
+make start-rpc
+```
 - start RPC server: https://docs.sui.io/devnet/build/json-rpc#start-rpc-server
 - moveCall: https://docs.sui.io/sui-jsonrpc#sui_moveCall
 - sui json: https://docs.sui.io/build/sui-json#type-coercion-rules
