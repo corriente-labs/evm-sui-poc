@@ -95,9 +95,7 @@ module vm::u256 {
         v5: u64,
         v6: u64,
         v7: u64,
-    }
-
-    
+    }    
 
     /// Convert `U256` to `u128` value if possible (otherwise it aborts).
     public fun as_u128(a: U256): u128 {
@@ -683,7 +681,7 @@ module vm::u256 {
         assert!(vector::length(&vec) == 32, 0);
         let i = 0;
         while(i < 32) {
-            let byte = vector::borrow(&vec, i);
+            let byte = *vector::borrow(&vec, i);
             assert!(byte == 0xff, 0);
             i = i + 1;
         };
@@ -694,7 +692,7 @@ module vm::u256 {
         let vec = vector::empty();
         let i = 0;
         while(i < 32) {
-            let byte = vector::push_back(&mut vec, 0xff);
+            vector::push_back(&mut vec, 0xff);
             i = i + 1;
         };
 
