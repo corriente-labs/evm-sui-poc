@@ -201,6 +201,35 @@ Mutated Objects:
   - ID: 0x6c320f11da70f65d2a05f51968ca1c86ea2816b0 , Owner: Account Address ( 0x128f64b1855c9546a7ae27318241796e1edb722a )
 ```
 
+### get account info
+- module: `vm`
+- package: `0xe0a854a72ebc77fcb532de742455e050fdd1166b`
+- func signature: `public entry fun get_account(_state: &StateV1, addr: vector<u8>)`
+- args
+  - _state: `0x493116f6f43be2d1309ec744e0761af7f7fe7aec`, `vm::StateV1` object we created in `create` section.
+  - addr: EVM address
+```
+sui client call --function get_account --module vm --package 0xe0a854a72ebc77fcb532de742455e050fdd1166b --args 0x493116f6f43be2d1309ec744e0761af7f7fe7aec youraddress --gas-budget 1000
+
+```
+```
+----- Certificate ----
+Transaction Hash: N/mfTzD6+jLhEZOYNzCB3VO/EFz5pE1sNmDTD66K1SA=
+Transaction Signature: AA==@doyEahmgY0o91PUHjb3ikVUqz7SKn0j3y/ZNPF1nqHtX/PulD58x3JwxtFSzj/npvU3wcQvmGS9MDUYZGOb6Aw==@ScQo2WLNfwQ2W43Vjha2/BfjVwldFNV4s18FBqywOB0=
+Signed Authorities Bitmap: RoaringBitmap<[1, 2, 3]>
+Transaction Kind : Call
+Package ID : 0xe0a854a72ebc77fcb532de742455e050fdd1166b
+Module : vm
+Function : get_account
+Arguments : ["0x493116f6f43be2d1309ec744e0761af7f7fe7aec", "youraddress"]
+Type Arguments : []
+----- Transaction Effects ----
+Status : Success
+Mutated Objects:
+  - ID: 0x493116f6f43be2d1309ec744e0761af7f7fe7aec , Owner: Shared
+  - ID: 0x6c320f11da70f65d2a05f51968ca1c86ea2816b0 , Owner: Account Address ( 0x128f64b1855c9546a7ae27318241796e1edb722a )
+```
+
 ### call EVM via RPC
 - start RPC server: https://docs.sui.io/devnet/build/json-rpc#start-rpc-server
 - moveCall: https://docs.sui.io/sui-jsonrpc#sui_moveCall
