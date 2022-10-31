@@ -229,6 +229,15 @@ Mutated Objects:
   - ID: 0x493116f6f43be2d1309ec744e0761af7f7fe7aec , Owner: Shared
   - ID: 0x6c320f11da70f65d2a05f51968ca1c86ea2816b0 , Owner: Account Address ( 0x128f64b1855c9546a7ae27318241796e1edb722a )
 ```
+#### get events
+- getEventByModule: https://docs.sui.io/sui-jsonrpc#sui_getEventsByModule
+```
+curl http://localhost:5001 -X POST -H "Content-Type: application/json" -d '{"jsonrpc": "2.0", "id": 1, "method": "sui_getEventsByModule", "params": ["0xe0a854a72ebc77fcb532de742455e050fdd1166b", "vm", 10, 0, 10]}'
+```
+```
+{"jsonrpc":"2.0","error":{"code":-32601,"message":"Method not found"},"id":1}
+```
+**Not supported yet?**
 
 ### call EVM via RPC
 - start RPC server: https://docs.sui.io/devnet/build/json-rpc#start-rpc-server
