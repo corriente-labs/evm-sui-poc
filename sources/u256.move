@@ -42,10 +42,10 @@ module vm::u256 {
     use std::vector;
 
     // Errors.
-    /// When can't cast `U256` to `u128` (e.g. number too large).
+    /// When can't cast `Big256` to `u128` (e.g. number too large).
     const ECAST_OVERFLOW: u64 = 0;
 
-    /// When trying to get or put word into U256 but it's out of index.
+    /// When trying to get or put word into Big256 but it's out of index.
     const EWORDS_OVERFLOW: u64 = 1;
 
     /// When math overflows.
@@ -62,10 +62,10 @@ module vm::u256 {
     /// Max `u128` value.
     const U128_MAX: u128 = 340282366920938463463374607431768211455;
 
-    /// Total words in `U256` (64 * 4 = 256).
+    /// Total words in `Big256` (64 * 4 = 256).
     const WORDS: u64 = 4;
 
-    /// When both `U256` equal.
+    /// When both `Big256` equal.
     const EQUAL: u8 = 0;
 
     /// When `a` is less than `b`.
@@ -76,16 +76,17 @@ module vm::u256 {
 
     // Data structs.
 
-    /// The `U256` resource.
+    /// The `Big256` resource. 256-bits Unsigned Integer
+    /// name `U256` throws error when building.
     /// Contains 4 u64 numbers.
-    struct U256 has copy, drop, store {
+    struct Big256 has copy, drop, store {
         v0: u64,
         v1: u64,
         v2: u64,
         v3: u64,
     }
 
-    /// Double `U256` used for multiple (to store overflow).
+    /// Double `Big256` used for multiple (to store overflow).
     struct DU256 has copy, drop, store {
         v0: u64,
         v1: u64,
@@ -97,20 +98,20 @@ module vm::u256 {
         v7: u64,
     }    
 
-    /// Convert `U256` to `u128` value if possible (otherwise it aborts).
-    public fun as_u128(a: U256): u128 {
+    /// Convert `Big256` to `u128` value if possible (otherwise it aborts).
+    public fun as_u128(a: Big256): u128 {
         assert!(a.v2 == 0 && a.v3 == 0, ECAST_OVERFLOW);
         ((a.v1 as u128) << 64) + (a.v0 as u128)
     }
 
-    /// Convert `U256` to `u64` value if possible (otherwise it aborts).
-    public fun as_u64(a: U256): u64 {
+    /// Convert `Big256` to `u64` value if possible (otherwise it aborts).
+    public fun as_u64(a: Big256): u64 {
         assert!(a.v1 == 0 && a.v2 == 0 && a.v3 == 0, ECAST_OVERFLOW);
         a.v0
     }
 
-    /// Compares two `U256` numbers.
-    public fun compare(a: &U256, b: &U256): u8 {
+    /// Compares two `Big256` numbers.
+    public fun compare(a: &Big256, b: &Big256): u8 {
         let i = WORDS;
         while (i > 0) {
             i = i - 1;
@@ -129,16 +130,16 @@ module vm::u256 {
         EQUAL
     }
 
-    /// Returns a `U256` from `u64` value.
-    public fun from_u64(val: u64): U256 {
+    /// Returns a `Big256` from `u64` value.
+    public fun from_u64(val: u64): Big256 {
         from_u128((val as u128))
     }
 
-    /// Returns a `U256` from `u128` value.
-    public fun from_u128(val: u128): U256 {
+    /// Returns a `Big256` from `u128` value.
+    public fun from_u128(val: u128): Big256 {
         let (a2, a1) = split_u128(val);
 
-        U256 {
+        Big256 {
             v0: a1,
             v1: a2,
             v2: 0,
@@ -146,7 +147,7 @@ module vm::u256 {
         }
     }
 
-    public fun to_vec(a: &U256): vector<u8> {
+    public fun to_vec(a: &Big256): vector<u8> {
         let ret: vector<u8> = vector::empty();
         u64_to_vec(&mut ret, a.v3);
         u64_to_vec(&mut ret, a.v2);
@@ -155,12 +156,12 @@ module vm::u256 {
         ret
     }
 
-    public fun from_vec(vec: &vector<u8>): U256 {
+    public fun from_vec(vec: &vector<u8>): Big256 {
         let v3 = vec_to_u64(vec, 24, 8);
         let v2 = vec_to_u64(vec, 16, 8);
         let v1 = vec_to_u64(vec, 8, 8);
         let v0 = vec_to_u64(vec, 0, 8);
-        U256 {
+        Big256 {
             v0,
             v1,
             v2,
@@ -169,11 +170,11 @@ module vm::u256 {
     }
 
     fun u64_to_vec(vec: &mut vector<u8>, a: u64) {
-        let i = 7;
-        while (i >= 0) {
-            let byte = ((a >> i) as u8);
+        let i = 0;
+        while (i < 8) {
+            let byte = (((a >> (7 - i)) & 0xff) as u8);
             vector::push_back(vec, byte);
-            i = i - 1;
+            i = i + 1;
         };
     }
 
@@ -183,7 +184,7 @@ module vm::u256 {
 
         let i = 0;
         while(i < size) {
-            let byte = *vector::borrow(vec, offset + size - i);
+            let byte = *vector::borrow(vec, offset + size - i - 1);
             let byte: u64 = (byte as u64);
             let byte = byte << (8*(i as u8));
             ret = ret + byte;
@@ -193,8 +194,8 @@ module vm::u256 {
     }
 
     // Public functions.
-    /// Adds two `U256` and returns sum.
-    public fun add(a: U256, b: U256): U256 {
+    /// Adds two `Big256` and returns sum.
+    public fun add(a: Big256, b: Big256): Big256 {
         let ret = zero();
         let carry = 0u64;
 
@@ -233,8 +234,8 @@ module vm::u256 {
     }
 
 
-    /// Multiples two `U256`.
-    public fun mul(a: U256, b: U256): U256 {
+    /// Multiples two `Big256`.
+    public fun mul(a: Big256, b: Big256): Big256 {
         let ret = DU256 {
             v0: 0,
             v1: 0,
@@ -294,8 +295,8 @@ module vm::u256 {
         r
     }
 
-    /// Subtracts two `U256`, returns result.
-    public fun sub(a: U256, b: U256): U256 {
+    /// Subtracts two `Big256`, returns result.
+    public fun sub(a: Big256, b: Big256): Big256 {
         let ret = zero();
 
         let carry = 0u64;
@@ -335,7 +336,7 @@ module vm::u256 {
     }
 
     /// Divide `a` by `b`.
-    public fun div(a: U256, b: U256): U256 {
+    public fun div(a: Big256, b: Big256): Big256 {
         let ret = zero();
 
         let a_bits = bits(&a);
@@ -373,7 +374,7 @@ module vm::u256 {
     }
 
     /// Binary xor `a` by `b`.
-    fun bitxor(a: U256, b: U256): U256 {
+    fun bitxor(a: Big256, b: Big256): Big256 {
         let ret = zero();
 
         let i = 0;
@@ -389,7 +390,7 @@ module vm::u256 {
     }
 
     /// Binary and `a` by `b`.
-    fun bitand(a: U256, b: U256): U256 {
+    fun bitand(a: Big256, b: Big256): Big256 {
         let ret = zero();
 
         let i = 0;
@@ -405,7 +406,7 @@ module vm::u256 {
     }
 
     /// Binary or `a` by `b`.
-    fun bitor(a: U256, b: U256): U256 {
+    fun bitor(a: Big256, b: Big256): Big256 {
         let ret = zero();
 
         let i = 0;
@@ -421,7 +422,7 @@ module vm::u256 {
     }
 
     /// Shift right `a`  by `shift`.
-    public fun shr(a: U256, shift: u8): U256 {
+    public fun shr(a: Big256, shift: u8): Big256 {
         let ret = zero();
 
         let word_shift = (shift as u64) / 64;
@@ -447,7 +448,7 @@ module vm::u256 {
     }
 
     /// Shift left `a` by `shift`.
-    public fun shl(a: U256, shift: u8): U256 {
+    public fun shl(a: Big256, shift: u8): Big256 {
         let ret = zero();
 
         let word_shift = (shift as u64) / 64;
@@ -473,9 +474,9 @@ module vm::u256 {
         ret
     }
 
-    /// Returns `U256` equals to zero.
-    public fun zero(): U256 {
-        U256 {
+    /// Returns `Big256` equals to zero.
+    public fun zero(): Big256 {
+        Big256 {
             v0: 0,
             v1: 0,
             v2: 0,
@@ -485,7 +486,7 @@ module vm::u256 {
 
     // Private functions.
     /// Get bits used to store `a`.
-    fun bits(a: &U256): u64 {
+    fun bits(a: &Big256): u64 {
         let i = 1;
         while (i < WORDS) {
             let a1 = get(a, WORDS - i);
@@ -574,7 +575,7 @@ module vm::u256 {
     }
 
     /// Get word from `a` by index `i`.
-    public fun get(a: &U256, i: u64): u64 {
+    public fun get(a: &Big256, i: u64): u64 {
         if (i == 0) {
             a.v0
         } else if (i == 1) {
@@ -611,8 +612,8 @@ module vm::u256 {
         }
     }
 
-    /// Put new word `val` into `U256` by index `i`.
-    fun put(a: &mut U256, i: u64, val: u64) {
+    /// Put new word `val` into `Big256` by index `i`.
+    fun put(a: &mut Big256, i: u64, val: u64) {
         if (i == 0) {
             a.v0 = val;
         } else if (i == 1) {
@@ -649,9 +650,9 @@ module vm::u256 {
         }
     }
 
-    /// Convert `DU256` to `U256`.
-    fun du256_to_u256(a: DU256): (U256, bool) {
-        let b = U256 {
+    /// Convert `DU256` to `Big256`.
+    fun du256_to_u256(a: DU256): (Big256, bool) {
+        let b = Big256 {
             v0: a.v0,
             v1: a.v1,
             v2: a.v2,
@@ -669,7 +670,7 @@ module vm::u256 {
     // Tests.
     #[test]
     fun test_to_vec() {
-        let a = U256 {
+        let a = Big256 {
             v0: 18446744073709551615,
             v1: 18446744073709551615,
             v2: 18446744073709551615,
@@ -825,7 +826,7 @@ module vm::u256 {
 
     #[test]
     fun test_get() {
-        let a = U256 {
+        let a = Big256 {
             v0: 1,
             v1: 2,
             v2: 3,
@@ -896,18 +897,21 @@ module vm::u256 {
     }
 
     #[test]
-    #[expected_failure(abort_code = 2)]
     fun test_add_overflow() {
         let max = (U64_MAX as u64);
 
-        let a = U256 {
+        let a = Big256 {
             v0: max,
             v1: max,
             v2: max,
             v3: max
         };
 
-        let _ = add(a, from_u128(1));
+        let s = add(a, from_u128(1));
+        assert!(s.v0 == 0, 0);
+        assert!(s.v1 == 0, 1);
+        assert!(s.v2 == 0, 2);
+        assert!(s.v3 == 0, 3);
     }
 
     #[test]
@@ -920,12 +924,17 @@ module vm::u256 {
     }
 
     #[test]
-    #[expected_failure(abort_code = 2)]
     fun test_sub_overflow() {
+        let max = (U64_MAX as u64);
+        
         let a = from_u128(0);
         let b = from_u128(1);
 
-        let _ = sub(a, b);
+        let s = sub(a, b);
+        assert!(s.v0 == max, 0);
+        assert!(s.v1 == max, 1);
+        assert!(s.v2 == max, 2);
+        assert!(s.v3 == max, 3);
     }
 
     #[test]
@@ -1016,7 +1025,7 @@ module vm::u256 {
     fun test_mul_overflow() {
         let max = (U64_MAX as u64);
 
-        let a = U256 {
+        let a = Big256 {
             v0: max,
             v1: max,
             v2: max,
