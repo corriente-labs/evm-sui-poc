@@ -285,11 +285,11 @@ module vm::test_vm {
             let state_val = test::take_shared<StateV1>(scenario);
             let state = &mut state_val;
 
-            let amount = 100;
-            let coin = test::take_from_sender<Coin<SUI>>(scenario);
-            let sent = coin::split<SUI>(&mut coin, amount, ctx(scenario));
+            let amount = 900;
+            let original = test::take_from_sender<Coin<SUI>>(scenario);
+            let coin = coin::split<SUI>(&mut original, amount, ctx(scenario));
 
-            vm::deposit(state, a_evm, coin);
+            vm::deposit(state, a_evm, coin); // deposit 900
             let balance = vm::pool_balance(state);
             assert!(balance == 900, 0);
 
@@ -297,8 +297,8 @@ module vm::test_vm {
             assert!(account::balance(acct) == 900, 0);
             assert!(account::nonce(acct) == 0, 0);
 
-            test::return_to_sender(scenario, sent);
             test::return_shared(state_val);
+            test::return_to_sender(scenario, original);
         };
 
         // a transfers 10 to b
@@ -340,7 +340,7 @@ module vm::test_vm {
             assert!(account::balance(acct) == 9, 0);
             assert!(account::nonce(acct) == 0, 0);
 
-            test::return_to_sender(scenario, sent);
+            sui::transfer(sent, b);
             test::return_shared(state_val);
         };
 
