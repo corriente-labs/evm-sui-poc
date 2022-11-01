@@ -4,7 +4,7 @@ SUI_COMMIT_HASH ?= df05544fb0cbd6d6db016e71e5facb5e7cc27988
 
 .PHONY: version
 version:
-	./script/version.sh
+	./scripts/version.sh
 
 .PHONY: build
 build:
