@@ -1,6 +1,6 @@
 export 
 LOCAL_NET_CONFIG_LOCATION ?= $(PWD)/local
-SUI_COMMIT_HASH ?= df05544fb0cbd6d6db016e71e5facb5e7cc27988
+SUI_COMMIT_HASH ?= 7fff531f90d912d2d2d77c5eca2e98c3c23ccdcf
 
 .PHONY: version
 version:

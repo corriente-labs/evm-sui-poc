@@ -1,6 +1,6 @@
 
 # v0.13.2 https://github.com/MystenLabs/sui/releases/tag/devnet-0.13.2
-# export SUI_COMMIT_HASH=7fff531f90d912d2d2d77c5eca2e98c3c23ccdcf
+export SUI_COMMIT_HASH=7fff531f90d912d2d2d77c5eca2e98c3c23ccdcf
 
 # v0.10.0 https://github.com/MystenLabs/sui/releases/tag/devnet-0.10.0
-export SUI_COMMIT_HASH=df05544fb0cbd6d6db016e71e5facb5e7cc27988
+# export SUI_COMMIT_HASH=df05544fb0cbd6d6db016e71e5facb5e7cc27988
