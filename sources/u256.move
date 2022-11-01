@@ -233,7 +233,6 @@ module vm::u256 {
         ret
     }
 
-
     /// Multiples two `Big256`.
     public fun mul(a: Big256, b: Big256): Big256 {
         let ret = DU256 {

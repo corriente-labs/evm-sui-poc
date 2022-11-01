@@ -65,14 +65,14 @@ module vm::vm {
     }
 
     public entry fun get_account(_state: &StateV1, addr: vector<u8>) {
-        let state = state(_state);
-        let accounts = state::accounts(state);
-        let acct = vec_map::get(accounts, &addr);
+        let _ = state(_state);
+        // let accounts = state::accounts(state);
+        // let acct = vec_map::get(accounts, &addr);
         event::emit(GetAccount {
-            addr: account::addr(acct),
-            balance: account::balance(acct),
-            nonce: account::nonce(acct),
-            code: account::code(acct),
+            addr: addr,
+            balance: 2,
+            nonce: 3,
+            code: vector::empty(),
         });
     }
 
