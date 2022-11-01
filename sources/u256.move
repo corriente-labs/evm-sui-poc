@@ -183,10 +183,14 @@ module vm::u256 {
         assert!(size <= 8, 0);
 
         let i = 0;
+        let pow: u64 = 1;
         while(i < size) {
+            if (i > 0) { // to avoid overflow
+                pow = pow * 256u64;
+            };
+
             let byte = *vector::borrow(vec, offset + size - i - 1);
-            let byte: u64 = (byte as u64);
-            let byte = byte << (8*(i as u8));
+            let byte: u64 = (byte as u64) * pow;
             ret = ret + byte;
             i = i + 1;
         };
@@ -688,6 +692,23 @@ module vm::u256 {
     }
 
     #[test]
+    fun test_vec_to_u64() {
+        let vec = vector::empty();
+
+        vector::push_back(&mut vec, 0xff);
+        vector::push_back(&mut vec, 0xff);
+        vector::push_back(&mut vec, 0xff);
+        vector::push_back(&mut vec, 0xff);
+        vector::push_back(&mut vec, 0xff);
+        vector::push_back(&mut vec, 0xff);
+        vector::push_back(&mut vec, 0xff);
+        vector::push_back(&mut vec, 0xff);
+
+        let num = vec_to_u64(&vec, 0, 8);
+        assert!(num == 0xffffffffffffffff, 0);
+    }
+
+    #[test]
     fun test_from_vec() {
         let vec = vector::empty();
         let i = 0;
@@ -697,10 +718,10 @@ module vm::u256 {
         };
 
         let a = from_vec(&vec);
-        assert!(a.v0 == 0xff, 0);
-        assert!(a.v1 == 0xff, 0);
-        assert!(a.v2 == 0xff, 0);
-        assert!(a.v3 == 0xff, 0);
+        assert!(a.v0 == 0xffffffffffffffff, 0);
+        assert!(a.v1 == 0xffffffffffffffff, 0);
+        assert!(a.v2 == 0xffffffffffffffff, 0);
+        assert!(a.v3 == 0xffffffffffffffff, 0);
     }
 
     #[test]
@@ -1020,10 +1041,10 @@ module vm::u256 {
     }
 
     #[test]
-    #[expected_failure(abort_code = 2)]
     fun test_mul_overflow() {
         let max = (U64_MAX as u64);
 
+        // a =  0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
         let a = Big256 {
             v0: max,
             v1: max,
@@ -1031,7 +1052,13 @@ module vm::u256 {
             v3: max,
         };
 
-        let _ = mul(a, from_u128(2));
+        // z = 0x1ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe
+        let z = mul(a, from_u128(2));
+
+        assert!(z.v0 == max - 1, 0);
+        assert!(z.v1 == max, 0);
+        assert!(z.v2 == max, 0);
+        assert!(z.v3 == max, 0);
     }
 
     #[test]
