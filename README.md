@@ -1,4 +1,5 @@
 # EVM on Sui
+For Sui version 0.13.2: [7fff531f90d912d2d2d77c5eca2e98c3c23ccdcf](https://github.com/MystenLabs/sui/releases/tag/devnet-0.13.2)
 
 ## Test on Local network
 https://docs.sui.io/devnet/build/cli-client#genesis
