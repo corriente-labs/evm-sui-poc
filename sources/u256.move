@@ -54,6 +54,8 @@ module vm::u256 {
     /// When attempted to divide by zero.
     const EDIV_BY_ZERO: u64 = 3;
 
+    const EINVALID_LENGTH: u64 = 4;
+
     // Constants.
 
     /// Max `u64` value.
@@ -79,11 +81,15 @@ module vm::u256 {
     /// The `Big256` resource. 256-bits Unsigned Integer
     /// name `U256` throws error when building.
     /// Contains 4 u64 numbers.
+    /// 
+    /// * internals
+    //  3333333333333333 2222222222222222 1111111111111111 0000000000000000
+    //  [  v3          ] [  v2          ] [  v1          ] [  v0          ]
     struct Big256 has copy, drop, store {
-        v0: u64,
+        v0: u64,    // least significant 64 bits
         v1: u64,
         v2: u64,
-        v3: u64,
+        v3: u64,    // most significant 64 bits
     }
 
     /// Double `Big256` used for multiple (to store overflow).
@@ -149,33 +155,36 @@ module vm::u256 {
 
     public fun to_vec(a: &Big256): vector<u8> {
         let ret: vector<u8> = vector::empty();
-        u64_to_vec(&mut ret, a.v3);
-        u64_to_vec(&mut ret, a.v2);
-        u64_to_vec(&mut ret, a.v1);
-        u64_to_vec(&mut ret, a.v0);
+        u64_to_u8a8(&mut ret, a.v3);
+        u64_to_u8a8(&mut ret, a.v2);
+        u64_to_u8a8(&mut ret, a.v1);
+        u64_to_u8a8(&mut ret, a.v0);
         ret
+    }
+    
+    // convert to u8 array with length 8
+    fun u64_to_u8a8(vec: &mut vector<u8>, a: u64) {
+        let i = 0;
+        while (i < 8) {
+            let byte = (((a >> ((7 - i) * 8)) & 0xff) as u8);
+            vector::push_back(vec, byte);
+            i = i + 1;
+        };
     }
 
     public fun from_vec(vec: &vector<u8>): Big256 {
-        let v3 = vec_to_u64(vec, 24, 8);
-        let v2 = vec_to_u64(vec, 16, 8);
-        let v1 = vec_to_u64(vec, 8, 8);
-        let v0 = vec_to_u64(vec, 0, 8);
+        assert!(vector::length(vec) == 32, EINVALID_LENGTH);
+
+        let v3 = vec_to_u64(vec, 0, 8);
+        let v2 = vec_to_u64(vec, 8, 8);
+        let v1 = vec_to_u64(vec, 16, 8);
+        let v0 = vec_to_u64(vec, 24, 8);
         Big256 {
             v0,
             v1,
             v2,
             v3
         }
-    }
-
-    fun u64_to_vec(vec: &mut vector<u8>, a: u64) {
-        let i = 0;
-        while (i < 8) {
-            let byte = (((a >> (7 - i)) & 0xff) as u8);
-            vector::push_back(vec, byte);
-            i = i + 1;
-        };
     }
 
     fun vec_to_u64(vec: &vector<u8>, offset: u64, size: u64): u64 {
@@ -671,22 +680,60 @@ module vm::u256 {
     }
 
     // Tests.
+
+    #[test]
+    fun test_u64_to_u8a8() {
+        let a = 0x0011223344556677;
+        let dst = vector::empty();
+
+        u64_to_u8a8(&mut dst, a);
+        assert!(vector::length(&dst) == 8, 0);
+        
+        let i = 0;
+        while(i < 8) {
+            let byte = *vector::borrow(&dst, i);
+            assert!(byte == (0x11*(i as u8)), 0);
+            i = i + 1;
+        }
+    }
+
     #[test]
     fun test_to_vec() {
         let a = Big256 {
-            v0: 18446744073709551615,
-            v1: 18446744073709551615,
-            v2: 18446744073709551615,
-            v3: 18446744073709551615,
+            v0: 0x0011223344556677,
+            v1: 0x1122334455667788,
+            v2: 0x2233445566778899,
+            v3: 0x33445566778899aa,
         };
 
-        let vec = to_vec(&a);
+        let dst = to_vec(&a);
 
-        assert!(vector::length(&vec) == 32, 0);
+        assert!(vector::length(&dst) == 32, 0);
         let i = 0;
-        while(i < 32) {
-            let byte = *vector::borrow(&vec, i);
-            assert!(byte == 0xff, 0);
+        while(i < 8) {
+            let byte = *vector::borrow(&dst, i);
+            assert!(byte == (0x33 + 0x11*(i as u8)), 0);
+            i = i + 1;
+        };
+
+        let i = 0;
+        while(i < 8) {
+            let byte = *vector::borrow(&dst, 8 + i);
+            assert!(byte == (0x22 + 0x11*(i as u8)), 0);
+            i = i + 1;
+        };
+
+        let i = 0;
+        while(i < 8) {
+            let byte = *vector::borrow(&dst, 16 + i);
+            assert!(byte == (0x11 + 0x11*(i as u8)), 0);
+            i = i + 1;
+        };
+
+        let i = 0;
+        while(i < 8) {
+            let byte = *vector::borrow(&dst, 24 + i);
+            assert!(byte == (0x11*(i as u8)), 0);
             i = i + 1;
         };
     }
@@ -695,17 +742,14 @@ module vm::u256 {
     fun test_vec_to_u64() {
         let vec = vector::empty();
 
-        vector::push_back(&mut vec, 0xff);
-        vector::push_back(&mut vec, 0xff);
-        vector::push_back(&mut vec, 0xff);
-        vector::push_back(&mut vec, 0xff);
-        vector::push_back(&mut vec, 0xff);
-        vector::push_back(&mut vec, 0xff);
-        vector::push_back(&mut vec, 0xff);
-        vector::push_back(&mut vec, 0xff);
+        let i = 0;
+        while(i < 8) {
+            vector::push_back(&mut vec, 0x11 * i);
+            i = i + 1;
+        };
 
-        let num = vec_to_u64(&vec, 0, 8);
-        assert!(num == 0xffffffffffffffff, 0);
+        let n = vec_to_u64(&vec, 0, 8);
+        assert!(n == 0x0011223344556677, 0);
     }
 
     #[test]
@@ -713,15 +757,15 @@ module vm::u256 {
         let vec = vector::empty();
         let i = 0;
         while(i < 32) {
-            vector::push_back(&mut vec, 0xff);
+            vector::push_back(&mut vec, i);
             i = i + 1;
         };
 
         let a = from_vec(&vec);
-        assert!(a.v0 == 0xffffffffffffffff, 0);
-        assert!(a.v1 == 0xffffffffffffffff, 0);
-        assert!(a.v2 == 0xffffffffffffffff, 0);
-        assert!(a.v3 == 0xffffffffffffffff, 0);
+        assert!(a.v0 == 0x18191a1b1c1d1e1f, 0);
+        assert!(a.v1 == 0x1011121314151617, 0);
+        assert!(a.v2 == 0x08090a0b0c0d0e0f, 0);
+        assert!(a.v3 == 0x0001020304050607, 0);
     }
 
     #[test]
