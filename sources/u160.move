@@ -3,17 +3,17 @@ module vm::u160 {
 
     const EINVALID_LENGTH: u64 = 0;
 
-    // Big160 internals
-    // 
-    // 000000000000000000000000ffffffff eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
-    // padded with zeros       [  v1  ] [              v0              ]
-    //
+    /// Big160 internals
+    /// 
+    /// 000000000000000000000000ffffffff eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+    /// padded with zeros       [  v1  ] [              v0              ]
+    ///
     struct Big160 has copy, drop, store {
         v1: u128,   // most significant 32 bit. padded with zeros.
         v0: u128,   // next significant 128 bit
     }
 
-    // convert to u8 array of length 20
+    /// convert to u8 array of length 20
     public fun to_vec(a: &Big160): vector<u8> {
         let ret: vector<u8> = vector::empty();
         u128_to_u8a4(&mut ret, a.v1);
@@ -21,7 +21,7 @@ module vm::u160 {
         ret
     }
     
-    // convert to u8 array of length 16
+    /// convert to u8 array of length 16
     fun u128_to_u8a16(vec: &mut vector<u8>, a: u128) {
         let i = 0;
         while (i < 16) {
@@ -31,7 +31,7 @@ module vm::u160 {
         };
     }
 
-    // convert to u8 array of length 4
+    /// convert to u8 array of length 4
     fun u128_to_u8a4(vec: &mut vector<u8>, a: u128) {
         let i = 0;
         while (i < 4) {
@@ -41,7 +41,7 @@ module vm::u160 {
         };
     }
 
-    // convert from u8 array of length < 20
+    /// convert from u8 array of length < 20
     public fun from_vec(vec: &vector<u8>): Big160 {
         assert!(vector::length(vec) == 20, EINVALID_LENGTH);
 
