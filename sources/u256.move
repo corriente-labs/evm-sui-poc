@@ -1091,6 +1091,13 @@ module vm::u256 {
         };
     }
 
+    #[test]
+    #[expected_failure(abort_code = 4)]
+    fun test_from_vec_too_large_vec() {
+        let vec = create_vec(33);
+        let _a = from_vec(&vec);
+    }
+
     #[test_only]
     fun create_vec(size: u8): vector<u8> {
         let vec = vector::empty();
