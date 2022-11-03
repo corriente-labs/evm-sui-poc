@@ -202,18 +202,13 @@ module vm::u256 {
             let v0 = vec_to_u64(vec, rem, 8);
             return Big256 { v0, v1, v2: 0, v3: 0 }
         } else {
-            if (len == 0) {
-                return zero()
-            };
-            let rem = len % 8;
-            let v0 = vec_to_u64(vec, 0, rem);
+            let v0 = vec_to_u64(vec, 0, len);
             return Big256 { v0, v1: 0, v2: 0, v3: 0 }
         }
     }
 
     fun vec_to_u64(vec: &vector<u8>, offset: u64, size: u64): u64 {
         let ret: u64 = 0;
-        assert!(size <= 8, 0);
 
         let i = 0;
         let pow: u64 = 1;

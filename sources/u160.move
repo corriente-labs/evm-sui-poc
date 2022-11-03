@@ -13,6 +13,13 @@ module vm::u160 {
         v0: u128,   // next significant 128 bit
     }
 
+    public fun zero(): Big160 {
+        Big160 {
+            v0: 0,
+            v1: 0,
+        }
+    }
+
     /// convert to u8 array of length 20
     public fun to_vec(a: &Big160): vector<u8> {
         let ret: vector<u8> = vector::empty();
@@ -43,13 +50,21 @@ module vm::u160 {
 
     /// convert from u8 array of length < 20
     public fun from_vec(vec: &vector<u8>): Big160 {
-        assert!(vector::length(vec) == 20, EINVALID_LENGTH);
-
-        let v1 = vec_to_u128(vec, 0, 4);
-        let v0 = vec_to_u128(vec, 4, 16);
-        Big160 {
-            v0,
-            v1,
+        let len = vector::length(vec);
+        assert!(len <= 20, EINVALID_LENGTH);
+        
+        if (len == 20) {
+            let v1 = vec_to_u128(vec, 0, 4);
+            let v0 = vec_to_u128(vec, 4, 16);
+            return Big160 { v0, v1, }
+        } else if (len >= 16) {
+            let rem = len % 16;
+            let v1 = vec_to_u128(vec, 0, rem);
+            let v0 = vec_to_u128(vec, rem, 16);
+            return Big160 { v0, v1, }
+        } else {
+            let v0 = vec_to_u128(vec, 0, len);
+            return Big160 { v0, v1: 0, }
         }
     }
 
@@ -144,8 +159,6 @@ module vm::u160 {
 
     #[test]
     fun test_from_vec() {
-        use std::debug;
-
         let vec = vector::empty();
         let i = 0;
         while(i < 20) {
@@ -155,10 +168,146 @@ module vm::u160 {
 
         let a = from_vec(&vec);
 
-        debug::print(&a.v0);
-        debug::print(&a.v1);
-
         assert!(a.v0 == 0x05060708090a0b0c0d0e0f1011121314, 0);
         assert!(a.v1 == 0x00000000000000000000000001020304, 0);
+
+        {
+            let vec = vector::empty();
+            let a = from_vec(&vec);
+            assert!(a.v0 == 0x00000000000000000000000000000000, 0);
+            assert!(a.v1 == 0x00000000000000000000000000000000, 0);
+        };
+        {
+            let vec = vector::empty();
+            vector::push_back(&mut vec, 0x11);
+            let a = from_vec(&vec);
+            assert!(a.v0 == 0x00000000000000000000000000000011, 0);
+            assert!(a.v1 == 0x00000000000000000000000000000000, 0);
+        };
+        {
+            let vec = create_vec(2);
+            let a = from_vec(&vec);
+            assert!(a.v0 == 0x00000000000000000000000000000001, 0);
+            assert!(a.v1 == 0x00000000000000000000000000000000, 0);
+        };
+        {
+            let vec = create_vec(3);
+            let a = from_vec(&vec);
+            assert!(a.v0 == 0x00000000000000000000000000000102, 0);
+            assert!(a.v1 == 0x00000000000000000000000000000000, 0);
+        };
+        {
+            let vec = create_vec(4);
+            let a = from_vec(&vec);
+            assert!(a.v0 == 0x00000000000000000000000000010203, 0);
+            assert!(a.v1 == 0x00000000000000000000000000000000, 0);
+        };
+        {
+            let vec = create_vec(5);
+            let a = from_vec(&vec);
+            assert!(a.v0 == 0x00000000000000000000000001020304, 0);
+            assert!(a.v1 == 0x00000000000000000000000000000000, 0);
+        };
+        {
+            let vec = create_vec(6);
+            let a = from_vec(&vec);
+            assert!(a.v0 == 0x00000000000000000000000102030405, 0);
+            assert!(a.v1 == 0x00000000000000000000000000000000, 0);
+        };
+        {
+            let vec = create_vec(7);
+            let a = from_vec(&vec);
+            assert!(a.v0 == 0x00000000000000000000010203040506, 0);
+            assert!(a.v1 == 0x00000000000000000000000000000000, 0);
+        };
+        {
+            let vec = create_vec(8);
+            let a = from_vec(&vec);
+            assert!(a.v0 == 0x00000000000000000001020304050607, 0);
+            assert!(a.v1 == 0x00000000000000000000000000000000, 0);
+        };
+        {
+            let vec = create_vec(9);
+            let a = from_vec(&vec);
+            assert!(a.v0 == 0x00000000000000000102030405060708, 0);
+            assert!(a.v1 == 0x00000000000000000000000000000000, 0);
+        };
+        {
+            let vec = create_vec(10);
+            let a = from_vec(&vec);
+            assert!(a.v0 == 0x00000000000000010203040506070809, 0);
+            assert!(a.v1 == 0x00000000000000000000000000000000, 0);
+        };
+        {
+            let vec = create_vec(11);
+            let a = from_vec(&vec);
+            assert!(a.v0 == 0x0000000000000102030405060708090a, 0);
+            assert!(a.v1 == 0x00000000000000000000000000000000, 0);
+        };
+        {
+            let vec = create_vec(12);
+            let a = from_vec(&vec);
+            assert!(a.v0 == 0x00000000000102030405060708090a0b, 0);
+            assert!(a.v1 == 0x00000000000000000000000000000000, 0);
+        };
+        {
+            let vec = create_vec(13);
+            let a = from_vec(&vec);
+            assert!(a.v0 == 0x000000000102030405060708090a0b0c, 0);
+            assert!(a.v1 == 0x00000000000000000000000000000000, 0);
+        };
+        {
+            let vec = create_vec(14);
+            let a = from_vec(&vec);
+            assert!(a.v0 == 0x0000000102030405060708090a0b0c0d, 0);
+            assert!(a.v1 == 0x00000000000000000000000000000000, 0);
+        };
+        {
+            let vec = create_vec(15);
+            let a = from_vec(&vec);
+            assert!(a.v0 == 0x00000102030405060708090a0b0c0d0e, 0);
+            assert!(a.v1 == 0x00000000000000000000000000000000, 0);
+        };
+        {
+            let vec = create_vec(16);
+            let a = from_vec(&vec);
+            assert!(a.v0 == 0x000102030405060708090a0b0c0d0e0f, 0);
+            assert!(a.v1 == 0x00000000000000000000000000000000, 0);
+        };
+        {
+            let vec = create_vec(17);
+            let a = from_vec(&vec);
+            assert!(a.v0 == 0x0102030405060708090a0b0c0d0e0f10, 0);
+            assert!(a.v1 == 0x00000000000000000000000000000000, 0);
+        };
+        {
+            let vec = create_vec(18);
+            let a = from_vec(&vec);
+            assert!(a.v0 == 0x02030405060708090a0b0c0d0e0f1011, 0);
+            assert!(a.v1 == 0x00000000000000000000000000000001, 0);
+        };
+        {
+            let vec = create_vec(19);
+            let a = from_vec(&vec);
+            assert!(a.v0 == 0x030405060708090a0b0c0d0e0f101112, 0);
+            assert!(a.v1 == 0x00000000000000000000000000000102, 0);
+        };
+        {
+            let vec = create_vec(20);
+            let a = from_vec(&vec);
+            assert!(a.v0 == 0x0405060708090a0b0c0d0e0f10111213, 0);
+            assert!(a.v1 == 0x00000000000000000000000000010203, 0);
+        };
+    }
+
+    #[test_only]
+    fun create_vec(size: u8): vector<u8> {
+        let vec = vector::empty();
+        let i = 0;
+        while(i < size) {
+            vector::push_back(&mut vec, i);
+            i = i + 1;
+        };
+        vec
     }
 }
