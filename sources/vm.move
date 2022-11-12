@@ -1,6 +1,5 @@
 module vm::vm {
     use sui::object::{Self, UID, uid_to_address};
-    use sui::vec_map::{Self};
     use sui::tx_context::TxContext;
     use sui::sui::{SUI};
     use sui::coin::{Coin, Self};
@@ -10,6 +9,9 @@ module vm::vm {
 
     use vm::state::{State, Self};
     use vm::account::{Account, Self};
+
+    use vm::u160::{Self, Big160};
+    use vm::u256::{Self, Big256};
 
     const EAmountInvalid: u64 = 0;
     const ENonceInvalid: u64 = 1;
@@ -32,7 +34,7 @@ module vm::vm {
     }
 
     struct GetAccount has copy, drop {
-        addr: vector<u8>,
+        addr: Big160,
         balance: u64,
         nonce: u128,
         code: vector<u8>,
@@ -64,7 +66,7 @@ module vm::vm {
         val
     }
 
-    public entry fun get_account(_state: &StateV1, addr: vector<u8>) {
+    public entry fun get_account(_state: &StateV1, addr: Big160) {
         let _ = state(_state);
         // let accounts = state::accounts(state);
         // let acct = vec_map::get(accounts, &addr);
@@ -76,61 +78,42 @@ module vm::vm {
         });
     }
 
-    public fun account(_state: &StateV1, addr: &vector<u8>): &Account {
+    public fun account(_state: &StateV1, addr: Big160): &Account {
         let state = state(_state);
-        let accounts = state::accounts(state);
-        let acct = vec_map::get(accounts, addr);
-        acct
+        state::get_account(state, addr)
     }
 
-    public fun deposit(_state: &mut StateV1, addr: vector<u8>, coin: Coin<SUI>) {
+    public fun deposit(_state: &mut StateV1, addr: Big160, coin: Coin<SUI>, ctx: &mut TxContext) {
         let val = coin::value(&coin);
-
         let state = state_mut(_state);
-        let accounts = state::accounts_mut(state);
-        if (vec_map::contains(accounts, &addr)) {
-            let acct = vec_map::get_mut(accounts, &addr);
-            let current_balance = account::balance(acct);
-            account::set_balance(acct, current_balance + val);
-        } else {
-            let acct = account::create(addr, val, 0, vector::empty());
-            vec_map::insert(accounts, addr, acct);
-        };
+
+        state::deposit(state, addr, val, ctx);
 
         let pool = state::pool_mut(state);
         coin::join(pool, coin);
     }
 
-    public fun withdraw(_state: &mut StateV1, nonce: u128, from: vector<u8>, amount: u64, ctx: &mut TxContext): Coin<SUI> {
+    public fun withdraw(_state: &mut StateV1, addr: Big160, amount: u64, ctx: &mut TxContext): Coin<SUI> {
         let state = state_mut(_state);
-        let accounts = state::accounts_mut(state);
-        let acct = vec_map::get_mut(accounts, &from);
-        
-        let current_nonce = account::nonce(acct);
-        assert!(current_nonce == nonce, ENonceInvalid);
-        account::nonce_increment(acct);
 
-        let current_balance = account::balance(acct);
-        assert!(current_balance >= amount, EAmountInvalid);
-        account::set_balance(acct, current_balance - amount);
+        state::withdraw(state, addr, amount);
 
         let pool = state::pool_mut(state);
         coin::take(coin::balance_mut(pool), amount, ctx)
     }
 
     #[test_only]
-    public entry fun edit_account(_state: &mut StateV1, addr: vector<u8>, nonce: u128, balance: u64, code: vector<u8>) {
+    public entry fun edit_account(_state: &mut StateV1, addr: Big160, nonce: u128, balance: u64, code: vector<u8>, ctx: &mut TxContext) {
         let state = state_mut(_state);
-        let accounts = state::accounts_mut(state);
 
-        if (vec_map::contains(accounts, &addr)) {
-            let acct = vec_map::get_mut(accounts, &addr);
+        if (state::contains_account(state, addr)) {
+            let acct = state::get_account_mut(state, addr);
             account::set_balance(acct, balance);
             account::set_nonce(acct, nonce);
             account::set_code(acct, code);
         } else {
-            let acct = account::create(addr, balance, nonce, code);
-            vec_map::insert(accounts, addr, acct);
+            let acct = account::new(ctx, addr, balance, nonce, code);
+            state::add(state, addr, acct);
         }
     }
 
@@ -142,29 +125,17 @@ module vm::vm {
         })
     }
 
-    public fun transfer(_state: &mut StateV1, nonce: u128, from: vector<u8>, to: vector<u8>, amount: u64) {
+    public fun transfer(_state: &mut StateV1, nonce: u128, from: Big160, to: Big160, amount: u64, ctx: &mut TxContext) {
         let state = state_mut(_state);
-        let accounts = state::accounts_mut(state);
-        let from_acct = vec_map::get_mut(accounts, &from);
 
-        assert!(vector::length(&to) == 20, EToInvalid);
+        let acct = state::get_account_mut(state, from);
+        let current_nonce = account::nonce(acct);
 
-        let current_nonce = account::nonce(from_acct);
         assert!(current_nonce == nonce, ENonceInvalid);
-        account::nonce_increment(from_acct);
 
-        let current_balance = account::balance(from_acct);
-        assert!(current_balance >= amount, EAmountInvalid);
-        account::set_balance(from_acct, current_balance - amount);
-
-        if (vec_map::contains(accounts, &to)) {
-            let to_acct = vec_map::get_mut(accounts, &to);
-            let current_balance = account::balance(to_acct);
-            account::set_balance(to_acct, current_balance + amount);
-        } else {
-            let to_acct = account::create(to, amount, 0, vector::empty());
-            vec_map::insert(accounts, to, to_acct);
-        }
+        account::nonce_increment(acct);
+        state::withdraw(state, from, amount);
+        state::deposit(state, to, amount, ctx);
     }
 
     // public fun call(_state: &StateV1, nonce: u128, from: vector<u8>, to: vector<u8>, amount: u128, data: vector<u8>) {

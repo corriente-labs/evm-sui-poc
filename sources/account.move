@@ -1,21 +1,28 @@
 module vm::account {
+    use sui::table::{Self, Table};
+    use sui::tx_context::TxContext;
+
+    use vm::u160::{Big160};
+    use vm::u256::{Self, Big256};
 
     struct Account has store {
-        addr: vector<u8>,
+        addr: Big160,
         balance: u64,
         nonce: u128,
         code: vector<u8>,
+        storage: Table<Big256, Big256>,
     }
-    public fun create(addr: vector<u8>, balance: u64, nonce: u128, code: vector<u8>): Account {
+    public fun new(ctx: &mut TxContext, addr: Big160, balance: u64, nonce: u128, code: vector<u8>): Account {
         Account {
             addr,
             balance,
             nonce,
             code,
+            storage: table::new(ctx),
         }
     }
 
-    public fun addr(acct: &Account): vector<u8> {
+    public fun addr(acct: &Account): Big160 {
         acct.addr
     }
     public fun balance(acct: &Account): u64 {
@@ -39,4 +46,21 @@ module vm::account {
     public fun set_code(acct: &mut Account, code: vector<u8>) {
         acct.code = code;
     }
+
+    public fun get_value(acct: &Account, key: Big256): Big256 {
+        if (table::contains(&acct.storage, key)) {
+            *table::borrow(&acct.storage, key)
+        } else {
+            u256::zero()
+        }
+    }
+    public fun set_value(acct: &mut Account, key: Big256, val: Big256) {
+        if (table::contains(&acct.storage, key)) {
+            let v = table::borrow_mut(&mut acct.storage, key);
+            *v = val;
+        } else {
+            table::add(&mut acct.storage, key, val);
+        };
+    }
+
 }
