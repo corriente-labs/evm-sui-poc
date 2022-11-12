@@ -39,6 +39,8 @@
 ///     * Could be improved with div_mod_small (current version probably would took a lot of resources for small numbers).
 ///     * Also could be improved with Knuth, TAOCP, Volume 2, section 4.3.1, Algorithm D (see link to Parity above).
 module vm::u256 {
+    use std::vector;
+
     // Errors.
     /// When can't cast `Big256` to `u128` (e.g. number too large).
     const ECAST_OVERFLOW: u64 = 0;
@@ -51,6 +53,8 @@ module vm::u256 {
 
     /// When attempted to divide by zero.
     const EDIV_BY_ZERO: u64 = 3;
+
+    const EINVALID_LENGTH: u64 = 4;
 
     // Constants.
 
@@ -74,13 +78,18 @@ module vm::u256 {
 
     // Data structs.
 
-    /// The `Big256` resource.
+    /// The `Big256` resource. 256-bits Unsigned Integer
+    /// name `U256` throws error when building.
     /// Contains 4 u64 numbers.
+    /// 
+    /// * internals
+    ///  3333333333333333 2222222222222222 1111111111111111 0000000000000000
+    ///  [  v3          ] [  v2          ] [  v1          ] [  v0          ]
     struct Big256 has copy, drop, store {
-        v0: u64,
+        v0: u64,    // least significant 64 bits
         v1: u64,
         v2: u64,
-        v3: u64,
+        v3: u64,    // most significant 64 bits
     }
 
     /// Double `Big256` used for multiple (to store overflow).
@@ -93,49 +102,7 @@ module vm::u256 {
         v5: u64,
         v6: u64,
         v7: u64,
-    }
-
-    // Public functions.
-    /// Adds two `Big256` and returns sum.
-    public fun add(a: Big256, b: Big256): Big256 {
-        let ret = zero();
-        let carry = 0u64;
-
-        let i = 0;
-        while (i < WORDS) {
-            let a1 = get(&a, i);
-            let b1 = get(&b, i);
-
-            if (carry != 0) {
-                let (res1, is_overflow1) = overflowing_add(a1, b1);
-                let (res2, is_overflow2) = overflowing_add(res1, carry);
-                put(&mut ret, i, res2);
-
-                carry = 0;
-                if (is_overflow1) {
-                    carry = carry + 1;
-                };
-
-                if (is_overflow2) {
-                    carry = carry + 1;
-                }
-            } else {
-                let (res, is_overflow) = overflowing_add(a1, b1);
-                put(&mut ret, i, res);
-
-                carry = 0;
-                if (is_overflow) {
-                    carry = 1;
-                };
-            };
-
-            i = i + 1;
-        };
-
-        assert!(carry == 0, EOVERFLOW);
-
-        ret
-    }
+    }    
 
     /// Convert `Big256` to `u128` value if possible (otherwise it aborts).
     public fun as_u128(a: Big256): u128 {
@@ -184,6 +151,117 @@ module vm::u256 {
             v2: 0,
             v3: 0,
         }
+    }
+
+    public fun to_vec(a: &Big256): vector<u8> {
+        let ret: vector<u8> = vector::empty();
+        u64_to_u8a8(&mut ret, a.v3);
+        u64_to_u8a8(&mut ret, a.v2);
+        u64_to_u8a8(&mut ret, a.v1);
+        u64_to_u8a8(&mut ret, a.v0);
+        ret
+    }
+    
+    // convert to u8 array with length 8
+    fun u64_to_u8a8(vec: &mut vector<u8>, a: u64) {
+        let i = 0;
+        while (i < 8) {
+            let byte = (((a >> ((7 - i) * 8)) & 0xff) as u8);
+            vector::push_back(vec, byte);
+            i = i + 1;
+        };
+    }
+
+    public fun from_vec(vec: &vector<u8>, offset: u64, len: u64): Big256 {
+        assert!(len <= 32, EINVALID_LENGTH);
+        let sec_len = len / 8;
+
+        if (sec_len == 4) {
+            let v3 = vec_to_u64(vec, offset, 8);
+            let v2 = vec_to_u64(vec, offset+8, 8);
+            let v1 = vec_to_u64(vec, offset+16, 8);
+            let v0 = vec_to_u64(vec, offset+24, 8);
+            return Big256 { v0, v1, v2, v3 }
+        } else if (sec_len == 3) {
+            let rem = len % 8;
+            let v3 = vec_to_u64(vec, offset, rem);
+            let v2 = vec_to_u64(vec, offset+rem, 8);
+            let v1 = vec_to_u64(vec, offset+rem+8, 8);
+            let v0 = vec_to_u64(vec, offset+rem+16, 8);
+            return Big256 { v0, v1, v2, v3 }
+        } else if (sec_len == 2) {
+            let rem = len % 8;
+            let v2 = vec_to_u64(vec, offset, rem);
+            let v1 = vec_to_u64(vec, offset+rem, 8);
+            let v0 = vec_to_u64(vec, offset+rem+8, 8);
+            return Big256 { v0, v1, v2, v3: 0 }
+        } else if (sec_len == 1) {
+            let rem = len % 8;
+            let v1 = vec_to_u64(vec, offset, rem);
+            let v0 = vec_to_u64(vec, offset+rem, 8);
+            return Big256 { v0, v1, v2: 0, v3: 0 }
+        } else {
+            let v0 = vec_to_u64(vec, offset, len);
+            return Big256 { v0, v1: 0, v2: 0, v3: 0 }
+        }
+    }
+
+    fun vec_to_u64(vec: &vector<u8>, offset: u64, size: u64): u64 {
+        let ret: u64 = 0;
+
+        let i = 0;
+        let pow: u64 = 1;
+        while(i < size) {
+            if (i > 0) { // to avoid overflow
+                pow = pow * 256u64;
+            };
+
+            let byte = *vector::borrow(vec, offset + size - i - 1);
+            let byte: u64 = (byte as u64) * pow;
+            ret = ret + byte;
+            i = i + 1;
+        };
+        ret
+    }
+
+    // Public functions.
+    /// Adds two `Big256` and returns sum.
+    public fun add(a: Big256, b: Big256): Big256 {
+        let ret = zero();
+        let carry = 0u64;
+
+        let i = 0;
+        while (i < WORDS) {
+            let a1 = get(&a, i);
+            let b1 = get(&b, i);
+
+            if (carry != 0) {
+                let (res1, is_overflow1) = overflowing_add(a1, b1);
+                let (res2, is_overflow2) = overflowing_add(res1, carry);
+                put(&mut ret, i, res2);
+
+                carry = 0;
+                if (is_overflow1) {
+                    carry = carry + 1;
+                };
+
+                if (is_overflow2) {
+                    carry = carry + 1;
+                }
+            } else {
+                let (res, is_overflow) = overflowing_add(a1, b1);
+                put(&mut ret, i, res);
+
+                carry = 0;
+                if (is_overflow) {
+                    carry = 1;
+                };
+            };
+
+            i = i + 1;
+        };
+
+        ret
     }
 
     /// Multiples two `Big256`.
@@ -243,8 +321,7 @@ module vm::u256 {
             i = i + 1;
         };
 
-        let (r, overflow) = du256_to_u256(ret);
-        assert!(!overflow, EOVERFLOW);
+        let (r, _overflow) = du256_to_u256(ret);
         r
     }
 
@@ -285,7 +362,6 @@ module vm::u256 {
             i = i + 1;
         };
 
-        assert!(carry == 0, EOVERFLOW);
         ret
     }
 
@@ -622,6 +698,443 @@ module vm::u256 {
     }
 
     // Tests.
+
+    #[test]
+    fun test_u64_to_u8a8() {
+        let a = 0x0011223344556677;
+        let dst = vector::empty();
+
+        u64_to_u8a8(&mut dst, a);
+        assert!(vector::length(&dst) == 8, 0);
+        
+        let i = 0;
+        while(i < 8) {
+            let byte = *vector::borrow(&dst, i);
+            assert!(byte == (0x11*(i as u8)), 0);
+            i = i + 1;
+        }
+    }
+
+    #[test]
+    fun test_to_vec() {
+        let a = Big256 {
+            v0: 0x0011223344556677,
+            v1: 0x1122334455667788,
+            v2: 0x2233445566778899,
+            v3: 0x33445566778899aa,
+        };
+
+        let dst = to_vec(&a);
+
+        assert!(vector::length(&dst) == 32, 0);
+        let i = 0;
+        while(i < 8) {
+            let byte = *vector::borrow(&dst, i);
+            assert!(byte == (0x33 + 0x11*(i as u8)), 0);
+            i = i + 1;
+        };
+
+        let i = 0;
+        while(i < 8) {
+            let byte = *vector::borrow(&dst, 8 + i);
+            assert!(byte == (0x22 + 0x11*(i as u8)), 0);
+            i = i + 1;
+        };
+
+        let i = 0;
+        while(i < 8) {
+            let byte = *vector::borrow(&dst, 16 + i);
+            assert!(byte == (0x11 + 0x11*(i as u8)), 0);
+            i = i + 1;
+        };
+
+        let i = 0;
+        while(i < 8) {
+            let byte = *vector::borrow(&dst, 24 + i);
+            assert!(byte == (0x11*(i as u8)), 0);
+            i = i + 1;
+        };
+    }
+
+    #[test]
+    fun test_vec_to_u64() {
+        {
+            let vec = create_vec(2); // 00 01
+            let n = vec_to_u64(&vec, 1, 1);
+            assert!(n == 0x0000000000000001, 0);
+        };
+        {
+            let vec = create_vec(2);
+            let n = vec_to_u64(&vec, 0, 2);
+            assert!(n == 0x000000000000001, 0);
+        };
+        {
+            let vec = create_vec(3);
+            let n = vec_to_u64(&vec, 0, 3);
+            assert!(n == 0x000000000000102, 0);
+        };
+        {
+            let vec = create_vec(4);
+            let n = vec_to_u64(&vec, 0, 4);
+            assert!(n == 0x000000000010203, 0);
+        };
+        {
+            let vec = create_vec(5);
+            let n = vec_to_u64(&vec, 0, 5);
+            assert!(n == 0x000000001020304, 0);
+        };
+        {
+            let vec = create_vec(6);
+            let n = vec_to_u64(&vec, 0, 6);
+            assert!(n == 0x000000102030405, 0);
+        };
+        {
+            let vec = create_vec(7);
+            let n = vec_to_u64(&vec, 0, 7);
+            assert!(n == 0x000010203040506, 0);
+        };
+        {
+            let vec = create_vec(8);
+            let n = vec_to_u64(&vec, 0, 8);
+            assert!(n == 0x0001020304050607, 0);
+        };
+    }
+
+    #[test]
+    fun test_from_vec() {
+        let vec = vector::empty();
+        let i = 0;
+        while(i < 32) {
+            vector::push_back(&mut vec, i);
+            i = i + 1;
+        };
+
+        let a = from_vec(&vec, 0, 32);
+        assert!(a.v0 == 0x18191a1b1c1d1e1f, 0);
+        assert!(a.v1 == 0x1011121314151617, 0);
+        assert!(a.v2 == 0x08090a0b0c0d0e0f, 0);
+        assert!(a.v3 == 0x0001020304050607, 0);
+    }
+
+    #[test]
+    fun test_from_vec_partial() {
+        {
+            let vec = vector::empty();
+            let a = from_vec(&vec, 0, 0);
+            assert!(a.v0 == 0x0000000000000000, 0);
+            assert!(a.v1 == 0x0000000000000000, 0);
+            assert!(a.v2 == 0x0000000000000000, 0);
+            assert!(a.v3 == 0x0000000000000000, 0);
+        };
+        {
+            let vec = vector::empty();
+            vector::push_back(&mut vec, 0x11);
+            let a = from_vec(&vec, 0, 1);
+            assert!(a.v0 == 0x0000000000000011, 0);
+            assert!(a.v1 == 0x0000000000000000, 0);
+            assert!(a.v2 == 0x0000000000000000, 0);
+            assert!(a.v3 == 0x0000000000000000, 0);
+        };
+        {
+            let vec = create_vec(2);
+            let a = from_vec(&vec, 0, 2);
+            assert!(a.v0 == 0x0000000000000001, 0);
+            assert!(a.v1 == 0x0000000000000000, 0);
+            assert!(a.v2 == 0x0000000000000000, 0);
+            assert!(a.v3 == 0x0000000000000000, 0);
+        };
+        {
+            let vec = create_vec(3);
+            let a = from_vec(&vec, 0, 3);
+            assert!(a.v0 == 0x0000000000000102, 0);
+            assert!(a.v1 == 0x0000000000000000, 0);
+            assert!(a.v2 == 0x0000000000000000, 0);
+            assert!(a.v3 == 0x0000000000000000, 0);
+        };
+        {
+            let vec = create_vec(4);
+            let a = from_vec(&vec, 0, 4);
+            assert!(a.v0 == 0x0000000000010203, 0);
+            assert!(a.v1 == 0x0000000000000000, 0);
+            assert!(a.v2 == 0x0000000000000000, 0);
+            assert!(a.v3 == 0x0000000000000000, 0);
+        };
+        {
+            let vec = create_vec(5);
+            let a = from_vec(&vec, 0, vector::length(&vec));
+            assert!(a.v0 == 0x0000000001020304, 0);
+            assert!(a.v1 == 0x0000000000000000, 0);
+            assert!(a.v2 == 0x0000000000000000, 0);
+            assert!(a.v3 == 0x0000000000000000, 0);
+        };
+        {
+            let vec = create_vec(6);
+            let a = from_vec(&vec, 0, vector::length(&vec));
+            assert!(a.v0 == 0x0000000102030405, 0);
+            assert!(a.v1 == 0x0000000000000000, 0);
+            assert!(a.v2 == 0x0000000000000000, 0);
+            assert!(a.v3 == 0x0000000000000000, 0);
+        };
+        {
+            let vec = create_vec(7);
+            let a = from_vec(&vec, 0, vector::length(&vec));
+            assert!(a.v0 == 0x0000010203040506, 0);
+            assert!(a.v1 == 0x0000000000000000, 0);
+            assert!(a.v2 == 0x0000000000000000, 0);
+            assert!(a.v3 == 0x0000000000000000, 0);
+        };
+        {
+            let vec = create_vec(8);
+            let a = from_vec(&vec, 0, vector::length(&vec));
+            assert!(a.v0 == 0x0001020304050607, 0);
+            assert!(a.v1 == 0x0000000000000000, 0);
+            assert!(a.v2 == 0x0000000000000000, 0);
+            assert!(a.v3 == 0x0000000000000000, 0);
+        };
+        {
+            let vec = create_vec(9);
+            let a = from_vec(&vec, 0, vector::length(&vec));
+            assert!(a.v0 == 0x0102030405060708, 0);
+            assert!(a.v1 == 0x0000000000000000, 0);
+            assert!(a.v2 == 0x0000000000000000, 0);
+            assert!(a.v3 == 0x0000000000000000, 0);
+        };
+        {
+            let vec = create_vec(10);
+            let a = from_vec(&vec, 0, vector::length(&vec));
+            assert!(a.v0 == 0x0203040506070809, 0);
+            assert!(a.v1 == 0x0000000000000001, 0);
+            assert!(a.v2 == 0x0000000000000000, 0);
+            assert!(a.v3 == 0x0000000000000000, 0);
+        };
+        {
+            let vec = create_vec(11);
+            let a = from_vec(&vec, 0, vector::length(&vec));
+            assert!(a.v0 == 0x030405060708090a, 0);
+            assert!(a.v1 == 0x0000000000000102, 0);
+            assert!(a.v2 == 0x0000000000000000, 0);
+            assert!(a.v3 == 0x0000000000000000, 0);
+        };
+        {
+            let vec = create_vec(12);
+            let a = from_vec(&vec, 0, vector::length(&vec));
+            assert!(a.v0 == 0x0405060708090a0b, 0);
+            assert!(a.v1 == 0x0000000000010203, 0);
+            assert!(a.v2 == 0x0000000000000000, 0);
+            assert!(a.v3 == 0x0000000000000000, 0);
+        };
+        {
+            let vec = create_vec(13);
+            let a = from_vec(&vec, 0, vector::length(&vec));
+            assert!(a.v0 == 0x05060708090a0b0c, 0);
+            assert!(a.v1 == 0x0000000001020304, 0);
+            assert!(a.v2 == 0x0000000000000000, 0);
+            assert!(a.v3 == 0x0000000000000000, 0);
+        };
+        {
+            let vec = create_vec(14);
+            let a = from_vec(&vec, 0, vector::length(&vec));
+            assert!(a.v0 == 0x060708090a0b0c0d, 0);
+            assert!(a.v1 == 0x0000000102030405, 0);
+            assert!(a.v2 == 0x0000000000000000, 0);
+            assert!(a.v3 == 0x0000000000000000, 0);
+        };
+        {
+            let vec = create_vec(15);
+            let a = from_vec(&vec, 0, vector::length(&vec));
+            assert!(a.v0 == 0x0708090a0b0c0d0e, 0);
+            assert!(a.v1 == 0x0000010203040506, 0);
+            assert!(a.v2 == 0x0000000000000000, 0);
+            assert!(a.v3 == 0x0000000000000000, 0);
+        };
+        {
+            let vec = create_vec(16);
+            let a = from_vec(&vec, 0, vector::length(&vec));
+            assert!(a.v0 == 0x08090a0b0c0d0e0f, 0);
+            assert!(a.v1 == 0x0001020304050607, 0);
+            assert!(a.v2 == 0x0000000000000000, 0);
+            assert!(a.v3 == 0x0000000000000000, 0);
+        };
+        {
+            let vec = create_vec(17);
+            let a = from_vec(&vec, 0, vector::length(&vec));
+            assert!(a.v0 == 0x090a0b0c0d0e0f10, 0);
+            assert!(a.v1 == 0x0102030405060708, 0);
+            assert!(a.v2 == 0x0000000000000000, 0);
+            assert!(a.v3 == 0x0000000000000000, 0);
+        };
+        {
+            let vec = create_vec(18);
+            let a = from_vec(&vec, 0, vector::length(&vec));
+            assert!(a.v0 == 0x0a0b0c0d0e0f1011, 0);
+            assert!(a.v1 == 0x0203040506070809, 0);
+            assert!(a.v2 == 0x0000000000000001, 0);
+            assert!(a.v3 == 0x0000000000000000, 0);
+        };
+        {
+            let vec = create_vec(19);
+            let a = from_vec(&vec, 0, vector::length(&vec));
+            assert!(a.v0 == 0x0b0c0d0e0f101112, 0);
+            assert!(a.v1 == 0x030405060708090a, 0);
+            assert!(a.v2 == 0x0000000000000102, 0);
+            assert!(a.v3 == 0x0000000000000000, 0);
+        };
+        {
+            let vec = create_vec(20);
+            let a = from_vec(&vec, 0, vector::length(&vec));
+            assert!(a.v0 == 0x0c0d0e0f10111213, 0);
+            assert!(a.v1 == 0x0405060708090a0b, 0);
+            assert!(a.v2 == 0x0000000000010203, 0);
+            assert!(a.v3 == 0x0000000000000000, 0);
+        };
+        {
+            let vec = create_vec(21);
+            let a = from_vec(&vec, 0, vector::length(&vec));
+            assert!(a.v0 == 0x0d0e0f1011121314, 0);
+            assert!(a.v1 == 0x05060708090a0b0c, 0);
+            assert!(a.v2 == 0x0000000001020304, 0);
+            assert!(a.v3 == 0x0000000000000000, 0);
+        };
+        {
+            let vec = create_vec(22);
+            let a = from_vec(&vec, 0, vector::length(&vec));
+            assert!(a.v0 == 0x0e0f101112131415, 0);
+            assert!(a.v1 == 0x060708090a0b0c0d, 0);
+            assert!(a.v2 == 0x0000000102030405, 0);
+            assert!(a.v3 == 0x0000000000000000, 0);
+        };
+        {
+            let vec = create_vec(23);
+            let a = from_vec(&vec, 0, vector::length(&vec));
+            assert!(a.v0 == 0x0f10111213141516, 0);
+            assert!(a.v1 == 0x0708090a0b0c0d0e, 0);
+            assert!(a.v2 == 0x0000010203040506, 0);
+            assert!(a.v3 == 0x0000000000000000, 0);
+        };
+        {
+            let vec = create_vec(24);
+            let a = from_vec(&vec, 0, vector::length(&vec));
+            assert!(a.v0 == 0x1011121314151617, 0);
+            assert!(a.v1 == 0x08090a0b0c0d0e0f, 0);
+            assert!(a.v2 == 0x0001020304050607, 0);
+            assert!(a.v3 == 0x0000000000000000, 0);
+        };
+        {
+            let vec = create_vec(25);
+            let a = from_vec(&vec, 0, vector::length(&vec));
+            assert!(a.v0 == 0x1112131415161718, 0);
+            assert!(a.v1 == 0x090a0b0c0d0e0f10, 0);
+            assert!(a.v2 == 0x0102030405060708, 0);
+            assert!(a.v3 == 0x0000000000000000, 0);
+        };
+        {
+            let vec = create_vec(26);
+            let a = from_vec(&vec, 0, vector::length(&vec));
+            assert!(a.v0 == 0x1213141516171819, 0);
+            assert!(a.v1 == 0x0a0b0c0d0e0f1011, 0);
+            assert!(a.v2 == 0x0203040506070809, 0);
+            assert!(a.v3 == 0x0000000000000001, 0);
+        };
+        {
+            let vec = create_vec(27);
+            let a = from_vec(&vec, 0, vector::length(&vec));
+            assert!(a.v0 == 0x131415161718191a, 0);
+            assert!(a.v1 == 0x0b0c0d0e0f101112, 0);
+            assert!(a.v2 == 0x030405060708090a, 0);
+            assert!(a.v3 == 0x0000000000000102, 0);
+        };
+        {
+            let vec = create_vec(28);
+            let a = from_vec(&vec, 0, vector::length(&vec));
+            assert!(a.v0 == 0x1415161718191a1b, 0);
+            assert!(a.v1 == 0x0c0d0e0f10111213, 0);
+            assert!(a.v2 == 0x0405060708090a0b, 0);
+            assert!(a.v3 == 0x0000000000010203, 0);
+        };
+        {
+            let vec = create_vec(29);
+            let a = from_vec(&vec, 0, vector::length(&vec));
+            assert!(a.v0 == 0x15161718191a1b1c, 0);
+            assert!(a.v1 == 0x0d0e0f1011121314, 0);
+            assert!(a.v2 == 0x05060708090a0b0c, 0);
+            assert!(a.v3 == 0x0000000001020304, 0);
+        };
+        {
+            let vec = create_vec(30);
+            let a = from_vec(&vec, 0, vector::length(&vec));
+            assert!(a.v0 == 0x161718191a1b1c1d, 0);
+            assert!(a.v1 == 0x0e0f101112131415, 0);
+            assert!(a.v2 == 0x060708090a0b0c0d, 0);
+            assert!(a.v3 == 0x0000000102030405, 0);
+        };
+        {
+            let vec = create_vec(31);
+            let a = from_vec(&vec, 0, vector::length(&vec));
+            assert!(a.v0 == 0x1718191a1b1c1d1e, 0);
+            assert!(a.v1 == 0x0f10111213141516, 0);
+            assert!(a.v2 == 0x0708090a0b0c0d0e, 0);
+            assert!(a.v3 == 0x0000010203040506, 0);
+        };
+        {
+            let vec = create_vec(32);
+            let a = from_vec(&vec, 0, vector::length(&vec));
+            assert!(a.v0 == 0x18191a1b1c1d1e1f, 0);
+            assert!(a.v1 == 0x1011121314151617, 0);
+            assert!(a.v2 == 0x08090a0b0c0d0e0f, 0);
+            assert!(a.v3 == 0x0001020304050607, 0);
+        };
+
+        {
+            let vec = create_vec(64);
+            {
+                let a = from_vec(&vec, 10, 3);
+                assert!(a.v0 == 0x00000000000a0b0c, 0);
+                assert!(a.v1 == 0x0000000000000000, 0);
+                assert!(a.v2 == 0x0000000000000000, 0);
+                assert!(a.v3 == 0x0000000000000000, 0);
+            };
+            {
+                let a = from_vec(&vec, 11, 4);
+                assert!(a.v0 == 0x000000000b0c0d0e, 0);
+                assert!(a.v1 == 0x0000000000000000, 0);
+                assert!(a.v2 == 0x0000000000000000, 0);
+                assert!(a.v3 == 0x0000000000000000, 0);
+            };
+            {
+                let a = from_vec(&vec, 5, 20);
+                assert!(a.v0 == 0x1112131415161718, 0);
+                assert!(a.v1 == 0x090a0b0c0d0e0f10, 0);
+                assert!(a.v2 == 0x0000000005060708, 0);
+                assert!(a.v3 == 0x0000000000000000, 0);
+            };
+            {
+                let a = from_vec(&vec, 25, 25);
+                assert!(a.v0 == 0x2a2b2c2d2e2f3031, 0);
+                assert!(a.v1 == 0x2223242526272829, 0);
+                assert!(a.v2 == 0x1a1b1c1d1e1f2021, 0);
+                assert!(a.v3 == 0x0000000000000019, 0);
+            };
+        };
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 4)]
+    fun test_from_vec_too_large_vec() {
+        let vec = create_vec(33);
+        let _a = from_vec(&vec, 0, 33);
+    }
+
+    #[test_only]
+    fun create_vec(size: u8): vector<u8> {
+        let vec = vector::empty();
+        let i = 0;
+        while(i < size) {
+            vector::push_back(&mut vec, i);
+            i = i + 1;
+        };
+        vec
+    }
+
     #[test]
     fun test_get_d() {
         let a = DU256 {
@@ -815,7 +1328,6 @@ module vm::u256 {
     }
 
     #[test]
-    #[expected_failure(abort_code = 2)]
     fun test_add_overflow() {
         let max = (U64_MAX as u64);
 
@@ -826,7 +1338,11 @@ module vm::u256 {
             v3: max
         };
 
-        let _ = add(a, from_u128(1));
+        let s = add(a, from_u128(1));
+        assert!(s.v0 == 0, 0);
+        assert!(s.v1 == 0, 1);
+        assert!(s.v2 == 0, 2);
+        assert!(s.v3 == 0, 3);
     }
 
     #[test]
@@ -839,12 +1355,17 @@ module vm::u256 {
     }
 
     #[test]
-    #[expected_failure(abort_code = 2)]
     fun test_sub_overflow() {
+        let max = (U64_MAX as u64);
+        
         let a = from_u128(0);
         let b = from_u128(1);
 
-        let _ = sub(a, b);
+        let s = sub(a, b);
+        assert!(s.v0 == max, 0);
+        assert!(s.v1 == max, 1);
+        assert!(s.v2 == max, 2);
+        assert!(s.v3 == max, 3);
     }
 
     #[test]
@@ -931,10 +1452,10 @@ module vm::u256 {
     }
 
     #[test]
-    #[expected_failure(abort_code = 2)]
     fun test_mul_overflow() {
         let max = (U64_MAX as u64);
 
+        // a =  0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
         let a = Big256 {
             v0: max,
             v1: max,
@@ -942,7 +1463,13 @@ module vm::u256 {
             v3: max,
         };
 
-        let _ = mul(a, from_u128(2));
+        // z = 0x1ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe
+        let z = mul(a, from_u128(2));
+
+        assert!(z.v0 == max - 1, 0);
+        assert!(z.v1 == max, 0);
+        assert!(z.v2 == max, 0);
+        assert!(z.v3 == max, 0);
     }
 
     #[test]
