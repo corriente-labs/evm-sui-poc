@@ -3,8 +3,8 @@ name = "PocVm"
 version = "0.0.1"
 
 [dependencies]
-Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework", rev = "7fff531f90d912d2d2d77c5eca2e98c3c23ccdcf" }
-MoveStdlib = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/deps/move-stdlib/", rev = "7fff531f90d912d2d2d77c5eca2e98c3c23ccdcf" }
+Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework", rev = "7c322323c464096a11a08a800b5199e85470df91" }
+MoveStdlib = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/deps/move-stdlib/", rev = "7c322323c464096a11a08a800b5199e85470df91" }
 
 [addresses]
 vm = "0x0"
