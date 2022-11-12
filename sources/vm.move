@@ -10,8 +10,8 @@ module vm::vm {
     use vm::state::{State, Self};
     use vm::account::{Account, Self};
 
-    use vm::u160::{Self, Big160};
-    use vm::u256::{Self, Big256};
+    use vm::u160::{Big160};
+    // use vm::u256::{Self, Big256};
 
     const EAmountInvalid: u64 = 0;
     const ENonceInvalid: u64 = 1;
@@ -162,6 +162,8 @@ module vm::test_vm {
     use vm::state::{Self};
     use vm::account::{Self};
 
+    use vm::u160::{Self};
+
     #[test]
     public fun test_transfer() {
         let sender = @0x1111;
@@ -240,7 +242,10 @@ module vm::test_vm {
         let b = @0x000b;
 
         let a_evm = x"ffff0000000000000000000000000000aaaaaaaa";
+        let a_evm = u160::from_vec(&a_evm, 0, 20);
+
         let b_evm = x"ffff0000000000000000000000000000bbbbbbbb";
+        let b_evm = u160::from_vec(&b_evm, 0, 20);
 
         next_tx(scenario, a); {
             let coin = mint<SUI>(1000, ctx(scenario));
@@ -260,11 +265,11 @@ module vm::test_vm {
             let original = test::take_from_sender<Coin<SUI>>(scenario);
             let coin = coin::split<SUI>(&mut original, amount, ctx(scenario));
 
-            vm::deposit(state, a_evm, coin); // deposit 900
+            vm::deposit(state, a_evm, coin, ctx(scenario)); // deposit 900
             let balance = vm::pool_balance(state);
             assert!(balance == 900, 0);
 
-            let acct = vm::account(state, &a_evm);
+            let acct = vm::account(state, a_evm);
             assert!(account::balance(acct) == 900, 0);
             assert!(account::nonce(acct) == 0, 0);
 
@@ -299,15 +304,15 @@ module vm::test_vm {
             let amount = 1;
             let sent = coin::split(&mut coin, amount, ctx(scenario));
 
-            vm::deposit(state_v1, b_evm, coin);
+            vm::deposit(state_v1, b_evm, coin, ctx(scenario));
             let balance = state::pool_balance(vm::state(state_v1));
             assert!(balance == 909, 0);
 
-            let acct = vm::account(state_v1, &a_evm);
+            let acct = vm::account(state_v1, a_evm);
             assert!(account::balance(acct) == 900, 0);
             assert!(account::nonce(acct) == 0, 0);
 
-            let acct = vm::account(state_v1, &b_evm);
+            let acct = vm::account(state_v1, b_evm);
             assert!(account::balance(acct) == 9, 0);
             assert!(account::nonce(acct) == 0, 0);
 
@@ -320,18 +325,18 @@ module vm::test_vm {
             let state_val = test::take_shared<StateV1>(scenario);
             let state_v1 = &mut state_val;
 
-            vm::transfer(state_v1, 0, a_evm, b_evm, 1);
-            vm::transfer(state_v1, 1, a_evm, b_evm, 1);
-            vm::transfer(state_v1, 0, b_evm, a_evm, 1);
+            vm::transfer(state_v1, 0, a_evm, b_evm, 1, ctx(scenario));
+            vm::transfer(state_v1, 1, a_evm, b_evm, 1, ctx(scenario));
+            vm::transfer(state_v1, 0, b_evm, a_evm, 1, ctx(scenario));
 
             let balance = vm::pool_balance(state_v1);
             assert!(balance == 909, 0);
 
-            let acct = vm::account(state_v1, &a_evm);
+            let acct = vm::account(state_v1, a_evm);
             assert!(account::balance(acct) == 899, 0);
             assert!(account::nonce(acct) == 2, 0);
 
-            let acct = vm::account(state_v1, &b_evm);
+            let acct = vm::account(state_v1, b_evm);
             assert!(account::balance(acct) == 10, 0);
             assert!(account::nonce(acct) == 1, 0);
 
@@ -343,20 +348,18 @@ module vm::test_vm {
             let state_val = test::take_shared<StateV1>(scenario);
             let state_v1 = &mut state_val;
 
-            let coin_withdrawn = vm::withdraw(state_v1, 2, a_evm, 100, ctx(scenario));
+            let coin_withdrawn = vm::withdraw(state_v1, a_evm, 100, ctx(scenario));
             let val = coin::value(&coin_withdrawn);
             assert!(val == 100, 0);
 
             let balance = vm::pool_balance(state_v1);
             assert!(balance == 809, 0);
 
-            let acct = vm::account(state_v1, &a_evm);
+            let acct = vm::account(state_v1, a_evm);
             assert!(account::balance(acct) == 799, 0);
-            assert!(account::nonce(acct) == 3, 0);
 
-            let acct = vm::account(state_v1, &b_evm);
+            let acct = vm::account(state_v1, b_evm);
             assert!(account::balance(acct) == 10, 0);
-            assert!(account::nonce(acct) == 1, 0);
 
             let coin = test::take_from_sender<Coin<SUI>>(scenario);
             coin::join(&mut coin, coin_withdrawn);
