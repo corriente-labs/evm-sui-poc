@@ -11,7 +11,7 @@ module vm::vm {
     use vm::account::{Account, Self};
 
     use vm::u160::{Big160};
-    // use vm::u256::{Self, Big256};
+    use vm::u256::{Self, Big256};
 
     const EAmountInvalid: u64 = 0;
     const ENonceInvalid: u64 = 1;
@@ -138,18 +138,107 @@ module vm::vm {
         state::deposit(state, to, amount, ctx);
     }
 
-    // public fun call(_state: &StateV1, nonce: u128, from: vector<u8>, to: vector<u8>, amount: u128, data: vector<u8>) {
-    //     let _ = nonce;
-    //     let _ = from;
-    //     let _ = to;
-    //     let _ = amount;
-    //     let _ = data;
-    //     event::emit(CallResult{
-    //         status: 0,
-    //         state_addr: uid_to_address(&_state.id),
-    //         data: vector::empty(),
-    //     })
-    // }
+    const ECALL_DEPTH_OVERFLOW: u64 = 1001;
+
+    fun call_inner(state: &mut State,
+        origin: Big160,
+        caller_addr: Big160,
+        to: Big160,
+        code: &vector<u8>,
+        calldata: &vector<u8>,
+        stack: &mut vector<Big256>,
+        mem: &mut vector<u8>,
+        ret_data: &mut vector<u8>,
+        depth: &mut u64,
+    ): vector<u8> {
+        let pc = 0u64;
+
+        assert!(*depth < 1024, ECALL_DEPTH_OVERFLOW);
+
+        while(pc < vector::length(code)) {
+            let op = *vector::borrow<u8>(code, pc);
+
+            // stop
+            if (op == 0x00) {
+                break
+            };
+
+            // add
+            if (op == 0x01) {
+                let lhs = vector::pop_back(stack);
+                let rhs = vector::pop_back(stack);
+                let result = u256::add(lhs, rhs);
+                vector::push_back(stack, result);
+                pc = pc + 1;
+                continue
+            };
+
+            // mul
+            if (op == 0x02) {
+                let lhs = vector::pop_back(stack);
+                let rhs = vector::pop_back(stack);
+                let result = u256::mul(lhs, rhs);
+                vector::push_back(stack, result);
+                pc = pc + 1;
+                continue
+            };
+
+            // sub
+            if (op == 0x03) {
+                let lhs = vector::pop_back(stack);
+                let rhs = vector::pop_back(stack);
+                let result = u256::sub(lhs, rhs);
+                vector::push_back(stack, result);
+                pc = pc + 1;
+                continue
+            };
+
+            // div
+            if (op == 0x03) {
+                let lhs = vector::pop_back(stack);
+                let rhs = vector::pop_back(stack);
+                let result = u256::div(lhs, rhs);
+                vector::push_back(stack, result);
+                pc = pc + 1;
+                continue
+            };
+
+            // pop
+            if (op == 0x50) {
+                let _ = vector::pop_back(stack);
+            };
+            
+            // push-n
+            if (op >= 0x60 && op <= 0x6f) {
+                let len = (op as u64) - 0x60;
+                let val = u256::from_vec(code, pc, len);
+                vector::push_back(stack, val);
+                pc = pc + 2 + len;
+                continue
+            };
+
+            // dup-n
+            if (op >= 0x80 && op <= 0x8f) {
+                let len = vector::length(stack);
+                let index = len - 1 - ((op as u64) - 0x80);
+                let value = vector::borrow(stack, index);
+                vector::push_back(stack, *value);
+                pc = pc + 1;
+                continue
+            };
+
+            // swap-n
+            if (op >= 0x90 && op <= 0x9f) {
+                let len = vector::length(stack);
+                let index = len - 1 - ((op as u64) - 0x90);
+                vector::swap(stack, index, len - 1);
+                pc = pc + 1;
+                continue
+            };
+        };
+
+        vector::empty()
+    }
 }
 
 #[test_only]
