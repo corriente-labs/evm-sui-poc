@@ -374,6 +374,16 @@ module vm::vm {
                 continue
             };
 
+            // TODO
+            // mstore8
+            // if (op == 0x53) {
+            //     let offset = vector::pop_back(stack);
+            //     let val = vector::pop_back(stack);
+            //     memory::mstore(mem, offset, val);
+            //     pc = pc + 1;
+            //     continue
+            // };
+
             // sload
             if (op == 0x54) {
                 let key = vector::pop_back(stack);
@@ -441,6 +451,7 @@ module vm::vm {
                 continue
             };
 
+            // TODO
             // gas
             // if (op == 0x5a) {
             //     pc = pc + 1;
@@ -481,6 +492,59 @@ module vm::vm {
                 continue
             };
 
+            // create
+            if (op == 0xf0) {
+                pc = pc + 1;
+                continue
+            };
+
+            // call
+            if (op == 0xf1) {
+                pc = pc + 1;
+                continue
+            };
+
+            // callcode
+            if (op == 0xf2) {
+                pc = pc + 1;
+                continue
+            };
+
+            // return
+            if (op == 0xf3) {
+                pc = pc + 1;
+                continue
+            };
+
+            // delegatecall
+            if (op == 0xf4) {
+                pc = pc + 1;
+                continue
+            };
+
+            // create2
+            if (op == 0xf5) {
+                pc = pc + 1;
+                continue
+            };
+
+            // staticcall
+            if (op == 0xfa) {
+                pc = pc + 1;
+                continue
+            };
+
+            // invalid
+            if (op == 0xfe) {
+                pc = pc + 1;
+                continue
+            };
+
+            // selfdestruct
+            if (op == 0xff) {
+                pc = pc + 1;
+                continue
+            };
         };
 
         vector::empty()
