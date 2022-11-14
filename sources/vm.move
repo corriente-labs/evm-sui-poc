@@ -1,17 +1,22 @@
 module vm::vm {
+    use std::vector;
+
     use sui::object::{Self, UID, uid_to_address};
     use sui::tx_context::TxContext;
     use sui::sui::{SUI};
     use sui::coin::{Coin, Self};
     use sui::event;
     use sui::transfer;
-    use std::vector;
 
     use vm::state::{State, Self};
     use vm::account::{Account, Self};
 
-    use vm::u160::{Big160};
+    use vm::u160::{Self, Big160};
     use vm::u256::{Self, Big256};
+    use vm::memory::{Self, Memory};
+
+    const WORDSIZE_BYTE: u8 = 32; // 256 bit
+    const WORDSIZE_BYTE_u64: u64 = 32; // 256 bit
 
     const EAmountInvalid: u64 = 0;
     const ENonceInvalid: u64 = 1;
@@ -44,6 +49,10 @@ module vm::vm {
         status: u128,
         state_addr: address,
         data: vector<u8>,
+    }
+    struct EvmEvent has copy, drop {
+        data: vector<u8>,
+        topics: vector<Big256>,
     }
 
     public entry fun create(ctx: &mut TxContext) {
@@ -139,15 +148,17 @@ module vm::vm {
     }
 
     const ECALL_DEPTH_OVERFLOW: u64 = 1001;
+    const ECALL_INVALID_JUMP: u64 = 1002;
 
     fun call_inner(state: &mut State,
         origin: Big160,
         caller_addr: Big160,
         to: Big160,
+        value: Big256,
         code: &vector<u8>,
         calldata: &vector<u8>,
         stack: &mut vector<Big256>,
-        mem: &mut vector<u8>,
+        mem: &mut Memory,
         ret_data: &mut vector<u8>,
         depth: &mut u64,
     ): vector<u8> {
@@ -206,6 +217,7 @@ module vm::vm {
             // pop
             if (op == 0x50) {
                 let _ = vector::pop_back(stack);
+                pc = pc + 1;
             };
             
             // push-n
@@ -235,6 +247,240 @@ module vm::vm {
                 pc = pc + 1;
                 continue
             };
+
+            // address
+            if (op == 0x30) {
+                vector::push_back(stack, u160::to_u256(to));
+                pc = pc + 1;
+                continue
+            };
+
+            // TODO
+            // balance
+            // if (op == 0x31) {
+            //     let addr = vector::pop_back(stack);
+            //     let addr = u160::from_u256(addr);
+            //     pc = pc + 1;
+            //     continue
+            // };
+
+            // origin
+            if (op == 0x32) {
+                vector::push_back(stack, u160::to_u256(origin));
+                pc = pc + 1;
+                continue
+            };
+
+            // caller
+            if (op == 0x33) {
+                vector::push_back(stack, u160::to_u256(caller_addr));
+                pc = pc + 1;
+                continue
+            };
+            
+            // callvalue
+            if (op == 0x34) {
+                vector::push_back(stack, value);
+                pc = pc + 1;
+                continue
+            };
+            
+            // calldataload
+            if (op == 0x35) {
+                let offset = vector::pop_back(stack);
+                let offset = u256::as_u64(offset);
+
+                let vec = vector::empty<u8>();
+
+                let index = 0;
+                while(offset + index < vector::length(calldata) && index < WORDSIZE_BYTE_u64) {
+                    let value = *vector::borrow(calldata, offset + index);
+                    vector::push_back(&mut vec, value);
+                    index = index + 1;
+                };
+
+                // fill with padding
+                while(index < WORDSIZE_BYTE_u64) {
+                    vector::push_back(&mut vec, 0);
+                    index = index + 1;
+                };
+
+                let val = u256::from_vec(&vec, 0, WORDSIZE_BYTE_u64);
+                vector::push_back(stack, val);    // push resulting value
+
+                pc = pc + 1;
+                continue
+            };
+            
+            // calldatasize
+            if (op == 0x36) {
+                let size = vector::length(calldata);
+                vector::push_back(stack, u256::from_u64(size));
+                pc = pc + 1;
+                continue
+            };
+            
+            // calldatacopy
+            if (op == 0x37) {
+                let dest_offset = vector::pop_back(stack);
+                let dest_offset = u256::as_u64(dest_offset);
+
+                let offset = vector::pop_back(stack);
+                let offset = u256::as_u64(offset);
+                
+                let size = vector::pop_back(stack);
+                let size = u256::as_u64(size);
+                
+                memory::expand(mem, offset, size);
+
+                // copy calldata elements to memory
+                let pad_size = memory::copy_from_vec(mem, dest_offset, calldata, offset, size);
+
+                // fill with padding
+                let index = 0;
+                while (index < pad_size) {
+                    memory::push(mem, 0);
+                    index = index + 1;
+                };
+
+                pc = pc + 1;
+            };
+
+            // returndatasize
+            if (op == 0x3d) {
+                let size = vector::length(ret_data);
+                let size = u256::from_u64(size);
+
+                vector::push_back(stack, size);
+                pc = pc + 1;
+                continue
+            };
+
+            // mload
+            if (op == 0x51) {
+                let offset = vector::pop_back(stack);
+                let val = memory::mload(mem, offset);
+                vector::push_back(stack, val);
+                pc = pc + 1;
+                continue
+            };
+
+            // mstore
+            if (op == 0x52) {
+                let offset = vector::pop_back(stack);
+                let val = vector::pop_back(stack);
+                memory::mstore(mem, offset, val);
+                pc = pc + 1;
+                continue
+            };
+
+            // sload
+            if (op == 0x54) {
+                let key = vector::pop_back(stack);
+
+                let acct = state::get_account(state, to);
+                let val = account::get_value(acct, key);
+
+                vector::push_back(stack, val);
+                pc = pc + 1;
+                continue
+            };
+
+            // sstore
+            if (op == 0x55) {
+                let key = vector::pop_back(stack);
+                let val = vector::pop_back(stack);
+                
+                let acct = state::get_account_mut(state, to);
+                account::set_value(acct, key, val);
+
+                pc = pc + 1;
+                continue
+            };
+
+            // jump
+            if (op == 0x56) {
+                let dest_pc = vector::pop_back(stack);
+                pc = u256::as_u64(dest_pc);
+
+                let dest_op = *vector::borrow(code, pc);
+                assert!(dest_op == 0x58, ECALL_INVALID_JUMP);
+
+                continue
+            };
+
+            // jumpi
+            if (op == 0x57) {
+                let dest_pc = vector::pop_back(stack);
+                let b = vector::pop_back(stack);
+
+                if (u256::is_zero(&b)) {
+                    pc = pc + 1;
+                } else {
+                    pc = u256::as_u64(dest_pc);
+                    let dest_op = *vector::borrow(code, pc);
+                    assert!(dest_op == 0x58, ECALL_INVALID_JUMP);
+                };
+                
+                continue
+            };
+
+            // pc
+            if (op == 0x58) {
+                let val = u256::from_u64(pc);
+                vector::push_back(stack, val);
+                pc = pc + 1;
+                continue
+            };
+
+            // msize
+            if (op == 0x59) {
+                let size = memory::msize(mem);
+                vector::push_back(stack, size);
+                pc = pc + 1;
+                continue
+            };
+
+            // gas
+            // if (op == 0x5a) {
+            //     pc = pc + 1;
+            //     continue
+            // };
+
+            // jumpdest
+            if (op == 0x5b) {
+                pc = pc + 1;
+                continue
+            };
+
+            // log-n
+            if (op >= 0xa0 && op <= 0xa4) {
+                let offset = vector::pop_back(stack);
+                let offset = u256::as_u64(offset);
+
+                let size = vector::pop_back(stack);
+                let size = u256::as_u64(size);
+
+                let data = memory::slice(mem, offset, size);
+
+                let topics = vector::empty();
+
+                let count = 0;
+                while (count < op - 0xa0) {
+                    let topic = vector::pop_back(stack);
+                    vector::push_back(&mut topics, topic);
+                    count = count + 1;
+                };
+
+                event::emit(EvmEvent{
+                    data: data,
+                    topics: topics,
+                });
+
+                pc = pc + 1;
+                continue
+            };
+
         };
 
         vector::empty()

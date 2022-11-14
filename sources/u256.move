@@ -102,7 +102,16 @@ module vm::u256 {
         v5: u64,
         v6: u64,
         v7: u64,
-    }    
+    }
+
+    public fun new(v0: u64, v1: u64, v2: u64, v3: u64): Big256 {
+        Big256 {
+            v0,
+            v1,
+            v2,
+            v3,
+        }
+    }
 
     /// Convert `Big256` to `u128` value if possible (otherwise it aborts).
     public fun as_u128(a: Big256): u128 {
@@ -134,6 +143,11 @@ module vm::u256 {
         };
 
         EQUAL
+    }
+
+    /// Is the given Big256 zero?
+    public fun is_zero(n: &Big256): bool {
+        n.v0 == 0 && n.v1 == 0 && n.v2 == 0 && n.v3 == 0
     }
 
     /// Returns a `Big256` from `u64` value.

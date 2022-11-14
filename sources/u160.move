@@ -1,6 +1,8 @@
 module vm::u160 {
     use std::vector;
 
+    use vm::u256::{Self, Big256};
+
     const EINVALID_LENGTH: u64 = 0;
 
     /// Big160 internals
@@ -17,6 +19,13 @@ module vm::u160 {
         Big160 {
             v0: 0,
             v1: 0,
+        }
+    }
+
+    public fun new(v0: u128, v1: u128): Big160 {
+        Big160 {
+            v0,
+            v1,
         }
     }
 
@@ -83,6 +92,25 @@ module vm::u160 {
             i = i + 1;
         };
         ret
+    }
+
+    public fun to_u256(n: Big160): Big256 {
+        let v0 = ((n.v0 & 0xffffffffffffffff) as u64);
+        let v1 = ((n.v0 >> 64) as u64);
+        let v2 = (n.v1 as u64);
+        u256::new(v0, v1, v2, 0)
+    }
+
+    public fun from_u256(n: Big256): Big160 {
+        let n_v0 = u256::get(&n, 0);
+        let v0_lsb: u128 = (n_v0 as u128);
+        let v0_msb: u128 = ((n_v0 as u128) << 64);
+        let v0 = v0_lsb + v0_msb;
+
+        let n_v1 = u256::get(&n, 1);
+        let v1 = (n_v1 as u128);
+
+        new(v0, v1)
     }
 
     #[test]
