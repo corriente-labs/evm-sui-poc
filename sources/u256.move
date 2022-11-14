@@ -125,6 +125,17 @@ module vm::u256 {
         a.v0
     }
 
+    /// Convert `Big256` to `u64` value if possible (otherwise it aborts).
+    public fun as_u8(a: Big256): u8 {
+        assert!(a.v1 == 0 && a.v2 == 0 && a.v3 == 0, ECAST_OVERFLOW);
+        (a.v0 as u8)
+    }
+
+    /// less than 256
+    public fun lt_256(a: Big256): bool {
+        a.v1 == 0 && a.v2 == 0 && a.v3 == 0 && a.v0 < 256
+    }
+
     /// Compares two `Big256` numbers.
     public fun compare(a: &Big256, b: &Big256): u8 {
         let i = WORDS;
@@ -418,7 +429,7 @@ module vm::u256 {
     }
 
     /// Binary xor `a` by `b`.
-    fun bitxor(a: Big256, b: Big256): Big256 {
+    public fun bitxor(a: Big256, b: Big256): Big256 {
         let ret = zero();
 
         let i = 0;
@@ -434,7 +445,7 @@ module vm::u256 {
     }
 
     /// Binary and `a` by `b`.
-    fun bitand(a: Big256, b: Big256): Big256 {
+    public fun bitand(a: Big256, b: Big256): Big256 {
         let ret = zero();
 
         let i = 0;
@@ -450,7 +461,7 @@ module vm::u256 {
     }
 
     /// Binary or `a` by `b`.
-    fun bitor(a: Big256, b: Big256): Big256 {
+    public fun bitor(a: Big256, b: Big256): Big256 {
         let ret = zero();
 
         let i = 0;
@@ -516,6 +527,16 @@ module vm::u256 {
         };
 
         ret
+    }
+
+    /// Returns `Big256` equals to one.
+    public fun one(): Big256 {
+        Big256 {
+            v0: 1,
+            v1: 0,
+            v2: 0,
+            v3: 0,
+        }
     }
 
     /// Returns `Big256` equals to zero.

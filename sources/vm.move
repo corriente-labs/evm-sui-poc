@@ -7,7 +7,8 @@ module vm::vm {
     use sui::coin::{Coin, Self};
     use sui::event;
     use sui::transfer;
-
+    use sui::ecdsa;
+    
     use vm::state::{State, Self};
     use vm::account::{Account, Self};
 
@@ -17,10 +18,15 @@ module vm::vm {
 
     const WORDSIZE_BYTE: u8 = 32; // 256 bit
     const WORDSIZE_BYTE_u64: u64 = 32; // 256 bit
+    const EQUAL: u8 = 0;
+    const LESS_THAN: u8 = 1;
+    const GREATER_THAN: u8 = 2;
 
     const EAmountInvalid: u64 = 0;
     const ENonceInvalid: u64 = 1;
     const EToInvalid: u64 = 2;
+
+
 
     // state wrapper
     struct StateV1 has key, store {
@@ -205,7 +211,7 @@ module vm::vm {
             };
 
             // div
-            if (op == 0x03) {
+            if (op == 0x04) {
                 let lhs = vector::pop_back(stack);
                 let rhs = vector::pop_back(stack);
                 let result = u256::div(lhs, rhs);
@@ -214,36 +220,276 @@ module vm::vm {
                 continue
             };
 
-            // pop
-            if (op == 0x50) {
-                let _ = vector::pop_back(stack);
+            // // sdiv
+            // if (op == 0x05) {
+            //     let lhs = vector::pop_back(stack);
+            //     let rhs = vector::pop_back(stack);
+            //     let result = u256::sdiv(lhs, rhs);
+            //     vector::push_back(stack, result);
+            //     pc = pc + 1;
+            //     continue
+            // };
+
+            // // mod
+            // if (op == 0x06) {
+            //     let lhs = vector::pop_back(stack);
+            //     let rhs = vector::pop_back(stack);
+            //     let result = u256::mod(lhs, rhs);
+            //     vector::push_back(stack, result);
+            //     pc = pc + 1;
+            //     continue
+            // };
+
+            // // smod
+            // if (op == 0x07) {
+            //     let lhs = vector::pop_back(stack);
+            //     let rhs = vector::pop_back(stack);
+            //     let result = u256::smod(lhs, rhs);
+            //     vector::push_back(stack, result);
+            //     pc = pc + 1;
+            //     continue
+            // };
+
+            // // addmod
+            // if (op == 0x08) {
+            //     let lhs = vector::pop_back(stack);
+            //     let rhs = vector::pop_back(stack);
+            //     let n = vector::pop_back(stack);
+            //     let result = u256::addmod(lhs, rhs, n);
+            //     vector::push_back(stack, result);
+            //     pc = pc + 1;
+            //     continue
+            // };
+
+            // // mulmod
+            // if (op == 0x09) {
+            //     let lhs = vector::pop_back(stack);
+            //     let rhs = vector::pop_back(stack);
+            //     let n = vector::pop_back(stack);
+            //     let result = u256::mulmod(lhs, rhs, n);
+            //     vector::push_back(stack, result);
+            //     pc = pc + 1;
+            //     continue
+            // };
+
+            // // exp
+            // if (op == 0x0a) {
+            //     let a = vector::pop_back(stack);
+            //     let exp = vector::pop_back(stack);
+            //     let result = u256::exp(a, exp);
+            //     vector::push_back(stack, result);
+            //     pc = pc + 1;
+            //     continue
+            // };
+
+            // // signextend
+            // if (op == 0x0b) {
+            //     let b = vector::pop_back(stack);
+            //     let x = vector::pop_back(stack);
+            //     let result = u256::signextend(b, x);
+            //     vector::push_back(stack, result);
+            //     pc = pc + 1;
+            //     continue
+            // };
+
+            // lt
+            if (op == 0x10) {
+                let a = vector::pop_back(stack);
+                let b = vector::pop_back(stack);
+                let result = u256::compare(&a, &b);
+                
+                if (result == LESS_THAN) {
+                    vector::push_back(stack, u256::one());
+                } else {
+                    vector::push_back(stack, u256::zero());
+                };
+
                 pc = pc + 1;
-            };
-            
-            // push-n
-            if (op >= 0x60 && op <= 0x6f) {
-                let len = (op as u64) - 0x60;
-                let val = u256::from_vec(code, pc, len);
-                vector::push_back(stack, val);
-                pc = pc + 2 + len;
                 continue
             };
 
-            // dup-n
-            if (op >= 0x80 && op <= 0x8f) {
-                let len = vector::length(stack);
-                let index = len - 1 - ((op as u64) - 0x80);
-                let value = vector::borrow(stack, index);
-                vector::push_back(stack, *value);
+            // gt
+            if (op == 0x11) {
+                let a = vector::pop_back(stack);
+                let b = vector::pop_back(stack);
+                let result = u256::compare(&a, &b);
+                
+                if (result == GREATER_THAN) {
+                    vector::push_back(stack, u256::one());
+                } else {
+                    vector::push_back(stack, u256::zero());
+                };
+
                 pc = pc + 1;
                 continue
             };
 
-            // swap-n
-            if (op >= 0x90 && op <= 0x9f) {
-                let len = vector::length(stack);
-                let index = len - 1 - ((op as u64) - 0x90);
-                vector::swap(stack, index, len - 1);
+            // // slt
+            // if (op == 0x12) {
+            //     let a = vector::pop_back(stack);
+            //     let b = vector::pop_back(stack);
+            //     let result = u256::signed_compare(&a, &b);
+                
+            //     if (result == LESS_THAN) {
+            //         vector::push_back(stack, u256::one());
+            //     } else {
+            //         vector::push_back(stack, u256::zero());
+            //     };
+
+            //     pc = pc + 1;
+            //     continue
+            // };
+
+            // // sgt
+            // if (op == 0x13) {
+            //     let a = vector::pop_back(stack);
+            //     let b = vector::pop_back(stack);
+            //     let result = u256::signed_compare(&a, &b);
+                
+            //     if (result == GREATER_THAN) {
+            //         vector::push_back(stack, u256::one());
+            //     } else {
+            //         vector::push_back(stack, u256::zero());
+            //     };
+
+            //     pc = pc + 1;
+            //     continue
+            // };
+
+            // eq
+            if (op == 0x14) {
+                let a = vector::pop_back(stack);
+                let b = vector::pop_back(stack);
+                let result = u256::compare(&a, &b);
+                
+                if (result == EQUAL) {
+                    vector::push_back(stack, u256::one());
+                } else {
+                    vector::push_back(stack, u256::zero());
+                };
+
+                pc = pc + 1;
+                continue
+            };
+
+            // iszero
+            if (op == 0x14) {
+                let a = vector::pop_back(stack);
+                if (u256::is_zero(&a)) {
+                    vector::push_back(stack, u256::one());
+                } else {
+                    vector::push_back(stack, u256::zero());
+                };
+
+                pc = pc + 1;
+                continue
+            };
+
+            // and
+            if (op == 0x16) {
+                let lhs = vector::pop_back(stack);
+                let rhs = vector::pop_back(stack);
+                let result = u256::bitand(lhs, rhs);
+                vector::push_back(stack, result);
+                pc = pc + 1;
+                continue
+            };
+
+            // or
+            if (op == 0x17) {
+                let lhs = vector::pop_back(stack);
+                let rhs = vector::pop_back(stack);
+                let result = u256::bitor(lhs, rhs);
+                vector::push_back(stack, result);
+                pc = pc + 1;
+                continue
+            };
+
+            // xor
+            if (op == 0x18) {
+                let lhs = vector::pop_back(stack);
+                let rhs = vector::pop_back(stack);
+                let result = u256::bitxor(lhs, rhs);
+                vector::push_back(stack, result);
+                pc = pc + 1;
+                continue
+            };
+
+            // // not
+            // if (op == 0x19) {
+            //     let a = vector::pop_back(stack);
+            //     let result = u256::bitnot(a);
+            //     vector::push_back(stack, result);
+            //     pc = pc + 1;
+            //     continue
+            // };
+
+            // // byte
+            // if (op == 0x1a) {
+            //     let i = vector::pop_back(stack);
+            //     let x = vector::pop_back(stack);
+            //     let result = u256::byte(i, x);
+            //     vector::push_back(stack, result);
+            //     pc = pc + 1;
+            //     continue
+            // };
+
+            // shl
+            if (op == 0x1b) {
+                let shift = vector::pop_back(stack);
+                if (u256::lt_256(shift)) {
+                    let shift = u256::as_u8(shift);
+                    let val = vector::pop_back(stack);
+                    let result = u256::shl(val, shift);
+                    vector::push_back(stack, result);
+                } else {
+                    vector::push_back(stack, u256::zero());
+                };
+                
+                pc = pc + 1;
+                continue
+            };
+
+            // shr
+            if (op == 0x1c) {
+                let shift = vector::pop_back(stack);
+                if (u256::lt_256(shift)) {
+                    let shift = u256::as_u8(shift);
+                    let val = vector::pop_back(stack);
+                    let result = u256::shr(val, shift);
+                    vector::push_back(stack, result);
+                } else {
+                    vector::push_back(stack, u256::zero());
+                };
+
+                pc = pc + 1;
+                continue
+            };
+
+            // // sar
+            // if (op == 0x1d) {
+            //     let shift = vector::pop_back(stack);
+            //     let val = vector::pop_back(stack);
+            //     let result = u256::sar(val, shift);
+            //     vector::push_back(stack, result);
+
+            //     pc = pc + 1;
+            //     continue
+            // };
+
+            // sha3
+            if (op == 0x20) {
+                let offset = vector::pop_back(stack);
+                let offset = u256::as_u64(offset);
+
+                let size = vector::pop_back(stack);
+                let size = u256::as_u64(size);
+
+                let preimage = memory::slice(mem, offset, size);
+                let image = ecdsa::keccak256(&preimage);
+                let image = u256::from_vec(&image, 0, 32);
+                vector::push_back(stack, image);
+
                 pc = pc + 1;
                 continue
             };
@@ -255,14 +501,21 @@ module vm::vm {
                 continue
             };
 
-            // TODO
             // balance
-            // if (op == 0x31) {
-            //     let addr = vector::pop_back(stack);
-            //     let addr = u160::from_u256(addr);
-            //     pc = pc + 1;
-            //     continue
-            // };
+            if (op == 0x31) {
+                let addr = vector::pop_back(stack);
+                let addr = u160::from_u256(addr);
+                if(state::contains_account(state, addr)) {
+                    let acct = state::get_account(state, addr);
+                    let balance = account::balance(acct);
+                    let balance = u256::from_u64(balance);
+                    vector::push_back(stack, balance);
+                } else {
+                    vector::push_back(stack, u256::zero());
+                };
+                pc = pc + 1;
+                continue
+            };
 
             // origin
             if (op == 0x32) {
@@ -344,6 +597,42 @@ module vm::vm {
                 };
 
                 pc = pc + 1;
+                continue
+            };
+
+            // TODO
+            // codesize
+            if (op == 0x38) {
+                pc = pc + 1;
+                continue
+            };
+
+            // TODO
+            // codecopy
+            if (op == 0x39) {
+                pc = pc + 1;
+                continue
+            };
+
+            // TODO
+            // gasprice
+            if (op == 0x3a) {
+                pc = pc + 1;
+                continue
+            };
+
+            // TODO
+            // extcodesize
+            if (op == 0x3b) {
+                pc = pc + 1;
+                continue
+            };
+
+            // TODO
+            // extcodecopy
+            if (op == 0x3c) {
+                pc = pc + 1;
+                continue
             };
 
             // returndatasize
@@ -354,6 +643,87 @@ module vm::vm {
                 vector::push_back(stack, size);
                 pc = pc + 1;
                 continue
+            };
+
+            // TODO
+            // returndatacopy
+            if (op == 0x3e) {
+                pc = pc + 1;
+                continue
+            };
+
+            // TODO
+            // extcodehash
+            if (op == 0x3f) {
+                pc = pc + 1;
+                continue
+            };
+
+            // TODO
+            // coinbase
+            if (op == 0x41) {
+                pc = pc + 1;
+                continue
+            };
+
+            // TODO
+            // timestamp
+            if (op == 0x42) {
+                pc = pc + 1;
+                continue
+            };
+
+            // TODO
+            // number
+            if (op == 0x43) {
+                pc = pc + 1;
+                continue
+            };
+
+            // TODO
+            // prevrandao
+            if (op == 0x44) {
+                pc = pc + 1;
+                continue
+            };
+
+            // TODO
+            // gaslimit
+            if (op == 0x45) {
+                pc = pc + 1;
+                continue
+            };
+
+            // TODO
+            // chainid
+            if (op == 0x46) {
+                pc = pc + 1;
+                continue
+            };
+
+            // selfbalance
+            if (op == 0x47) {
+                let addr = vector::pop_back(stack);
+                let addr = u160::from_u256(addr);
+                let acct = state::get_account(state, addr);
+                let balance = account::balance(acct);
+                let balance = u256::from_u64(balance);
+                vector::push_back(stack, balance);
+                pc = pc + 1;
+                continue
+            };
+
+            // TODO
+            // basefee
+            if (op == 0x48) {
+                pc = pc + 1;
+                continue
+            };
+
+            // pop
+            if (op == 0x50) {
+                let _ = vector::pop_back(stack);
+                pc = pc + 1;
             };
 
             // mload
@@ -460,6 +830,34 @@ module vm::vm {
 
             // jumpdest
             if (op == 0x5b) {
+                pc = pc + 1;
+                continue
+            };
+
+            // push-n
+            if (op >= 0x60 && op <= 0x7f) {
+                let len = (op as u64) - 0x60;
+                let val = u256::from_vec(code, pc, len);
+                vector::push_back(stack, val);
+                pc = pc + 2 + len;
+                continue
+            };
+
+            // dup-n
+            if (op >= 0x80 && op <= 0x8f) {
+                let len = vector::length(stack);
+                let index = len - 1 - ((op as u64) - 0x80);
+                let value = vector::borrow(stack, index);
+                vector::push_back(stack, *value);
+                pc = pc + 1;
+                continue
+            };
+
+            // swap-n
+            if (op >= 0x90 && op <= 0x9f) {
+                let len = vector::length(stack);
+                let index = len - 1 - ((op as u64) - 0x90);
+                vector::swap(stack, index, len - 1);
                 pc = pc + 1;
                 continue
             };
