@@ -485,7 +485,7 @@ module vm::vm {
                 let size = vector::pop_back(stack);
                 let size = u256::as_u64(size);
 
-                let preimage = memory::slice(mem, offset, size);
+                let preimage = memory::expand_slice(mem, offset, size);
                 let image = ecdsa::keccak256(&preimage);
                 let image = u256::from_vec(&image, 0, 32);
                 vector::push_back(stack, image);
@@ -870,7 +870,7 @@ module vm::vm {
                 let size = vector::pop_back(stack);
                 let size = u256::as_u64(size);
 
-                let data = memory::slice(mem, offset, size);
+                let data = memory::expand_slice(mem, offset, size);
 
                 let topics = vector::empty();
 
