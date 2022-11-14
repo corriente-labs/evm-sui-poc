@@ -744,15 +744,15 @@ module vm::vm {
                 continue
             };
 
-            // TODO
             // mstore8
-            // if (op == 0x53) {
-            //     let offset = vector::pop_back(stack);
-            //     let val = vector::pop_back(stack);
-            //     memory::mstore(mem, offset, val);
-            //     pc = pc + 1;
-            //     continue
-            // };
+            if (op == 0x53) {
+                let offset = vector::pop_back(stack);
+                let val = vector::pop_back(stack);
+                let val = u256::as_ls_u8(val);
+                memory::mstore8(mem, offset, val);
+                pc = pc + 1;
+                continue
+            };
 
             // sload
             if (op == 0x54) {

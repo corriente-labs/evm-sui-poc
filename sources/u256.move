@@ -131,6 +131,11 @@ module vm::u256 {
         (a.v0 as u8)
     }
 
+    // as least significant u8
+    public fun as_ls_u8(a: Big256): u8 {
+        ((a.v0 & 0xff) as u8)
+    }
+
     /// less than 256
     public fun lt_256(a: Big256): bool {
         a.v1 == 0 && a.v2 == 0 && a.v3 == 0 && a.v0 < 256
