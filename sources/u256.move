@@ -554,6 +554,15 @@ module vm::u256 {
         }
     }
 
+    public fun max(): Big256 {
+        Big256 {
+            v0: 0xffffffffffffffff,
+            v1: 0xffffffffffffffff,
+            v2: 0xffffffffffffffff,
+            v3: 0xffffffffffffffff,
+        }
+    }
+
     // Private functions.
     /// Get bits used to store `a`.
     fun bits(a: &Big256): u64 {
