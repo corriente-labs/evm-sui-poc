@@ -415,24 +415,24 @@ module vm::vm {
                 continue
             };
 
-            // // not
-            // if (op == 0x19) {
-            //     let a = vector::pop_back(stack);
-            //     let result = u256::bitnot(a);
-            //     vector::push_back(stack, result);
-            //     pc = pc + 1;
-            //     continue
-            // };
+            // not
+            if (op == 0x19) {
+                let a = vector::pop_back(stack);
+                let result = u256::bitnot(a);
+                vector::push_back(stack, result);
+                pc = pc + 1;
+                continue
+            };
 
-            // // byte
-            // if (op == 0x1a) {
-            //     let i = vector::pop_back(stack);
-            //     let x = vector::pop_back(stack);
-            //     let result = u256::byte(i, x);
-            //     vector::push_back(stack, result);
-            //     pc = pc + 1;
-            //     continue
-            // };
+            // byte
+            if (op == 0x1a) {
+                let i = vector::pop_back(stack);
+                let x = vector::pop_back(stack);
+                let result = u256::byte(i, x);
+                vector::push_back(stack, result);
+                pc = pc + 1;
+                continue
+            };
 
             // shl
             if (op == 0x1b) {

@@ -166,11 +166,6 @@ module vm::u256 {
         n.v0 == 0 && n.v1 == 0 && n.v2 == 0 && n.v3 == 0
     }
 
-    /// Returns a `Big256` from `u64` value.
-    public fun from_u64(val: u64): Big256 {
-        from_u128((val as u128))
-    }
-
     /// Returns a `Big256` from `u128` value.
     public fun from_u128(val: u128): Big256 {
         let (a2, a1) = split_u128(val);
@@ -178,6 +173,26 @@ module vm::u256 {
         Big256 {
             v0: a1,
             v1: a2,
+            v2: 0,
+            v3: 0,
+        }
+    }
+
+    /// Returns a `Big256` from `u64` value.
+    public fun from_u64(val: u64): Big256 {
+        Big256 {
+            v0: val,
+            v1: 0,
+            v2: 0,
+            v3: 0,
+        }
+    }
+
+    /// Returns a `Big256` from `u8` value.
+    public fun from_u8(val: u8): Big256 {
+        Big256 {
+            v0: (val as u64),
+            v1: 0,
             v2: 0,
             v3: 0,
         }
@@ -479,6 +494,35 @@ module vm::u256 {
         };
 
         ret
+    }
+
+    /// Binary not `a`.
+    public fun bitnot(a: Big256): Big256 {
+        let ret = zero();
+
+        let i = 0;
+        while (i < WORDS) {
+            let a1 = get(&a, i);
+            put(&mut ret, i, a1 ^ 0xffffffffffffffff);
+
+            i = i + 1;
+        };
+
+        ret
+    }
+
+    /// Binary not `a`.
+    public fun byte(i: Big256, x: Big256): Big256 {
+        let ret = zero();
+
+        if (i.v0 > 31 || i.v1 > 0 || i.v2 > 0 || i.v3 > 0) {
+            return ret
+        };
+
+        let m = get(&x, i.v0 / 8);
+        let shifted = m >> (((8*(i.v0 % 8 - 1)) & 0xff) as u8);
+
+        from_u64(shifted)
     }
 
     /// Shift right `a`  by `shift`.
@@ -1575,6 +1619,16 @@ module vm::u256 {
         let b = from_u128(0xf0f0f0f0f0f0f0f0u128);
         let c = bitxor(a, b);
         assert!(as_u128(c) == 0xffffffffffffffffu128, 1);
+    }
+
+    #[test]
+    fun test_not() {
+        assert!(false, 0);
+    }
+
+    #[test]
+    fun test_byte() {
+        assert!(false, 0);
     }
 
     #[test]
