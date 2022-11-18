@@ -422,10 +422,14 @@ module vm::u256 {
     public fun div(a: Big256, b: Big256): Big256 {
         let ret = zero();
 
+        if (is_zero(&b)) {
+            // Immidiatelly return.
+            return ret
+        };
+
         let a_bits = bits(&a);
         let b_bits = bits(&b);
 
-        assert!(b_bits != 0, EDIV_BY_ZERO); // DIVIDE BY ZERO.
         if (a_bits < b_bits) {
             // Immidiatelly return.
             return ret
@@ -1772,15 +1776,17 @@ module vm::u256 {
     }
 
     #[test]
-    fun test_mod() {
-        assert!(false, 0);
+    fun test_div_by_zero() {
+        let a = from_u128(100);
+        let b = from_u128(0);
+        let d = div(a, b);
+
+        assert!(as_u128(d) == 0, 0);
     }
 
     #[test]
-    #[expected_failure(abort_code=3)]
-    fun test_div_by_zero() {
-        let a = from_u128(1);
-        let _z = div(a, from_u128(0));
+    fun test_mod() {
+        assert!(false, 0);
     }
 
     #[test]
