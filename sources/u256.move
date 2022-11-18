@@ -1531,10 +1531,10 @@ module vm::u256 {
         let c = bitor(a, b);
         assert!(as_u128(c) == 1, 0);
 
-        let a = from_u128(0x0f0f0f0f0f0f0f0fu128);
-        let b = from_u128(0xf0f0f0f0f0f0f0f0u128);
+        let a = from_u256(0x0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f);
+        let b = from_u256(0xf0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0);
         let c = bitor(a, b);
-        assert!(as_u128(c) == 0xffffffffffffffffu128, 1);
+        assert!(as_u256(c) == 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff, 1);
     }
 
     #[test]
@@ -1542,17 +1542,17 @@ module vm::u256 {
         let a = from_u128(0);
         let b = from_u128(1);
         let c = bitand(a, b);
-        assert!(as_u128(c) == 0, 0);
+        assert!(as_u256(c) == 0, 0);
 
-        let a = from_u128(0x0f0f0f0f0f0f0f0fu128);
-        let b = from_u128(0xf0f0f0f0f0f0f0f0u128);
+        let a = from_u256(0x0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f);
+        let b = from_u256(0xf0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0);
         let c = bitand(a, b);
-        assert!(as_u128(c) == 0, 1);
+        assert!(as_u256(c) == 0, 1);
 
-        let a = from_u128(0x0f0f0f0f0f0f0f0fu128);
-        let b = from_u128(0x0f0f0f0f0f0f0f0fu128);
+        let a = from_u256(0x0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f);
+        let b = from_u256(0x0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f);
         let c = bitand(a, b);
-        assert!(as_u128(c) == 0x0f0f0f0f0f0f0f0fu128, 1);
+        assert!(as_u256(c) == 0x0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f, 1);
     }
 
     #[test]
@@ -1562,34 +1562,39 @@ module vm::u256 {
         let c = bitxor(a, b);
         assert!(as_u128(c) == 1, 0);
 
-        let a = from_u128(0x0f0f0f0f0f0f0f0fu128);
-        let b = from_u128(0xf0f0f0f0f0f0f0f0u128);
+        let a = from_u256(0x0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f);
+        let b = from_u256(0xf0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0);
         let c = bitxor(a, b);
-        assert!(as_u128(c) == 0xffffffffffffffffu128, 1);
+        assert!(as_u256(c) == 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff, 1);
+
+        let a = from_u256(0xff0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f00);
+        let b = from_u256(0xfff0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f000);
+        let c = bitxor(a, b);
+        assert!(as_u256(c) == 0x00ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00, 1);
     }
 
     #[test]
     fun test_not() {
-        let a = from_u128(0);
+        let a = from_u256(0);
         let a = bitnot(a);
         assert!(a.v0 == 0xffffffffffffffff, 0);
         assert!(a.v1 == 0xffffffffffffffff, 0);
         assert!(a.v2 == 0xffffffffffffffff, 0);
         assert!(a.v3 == 0xffffffffffffffff, 0);
 
-        let a = from_u128(0xffffffffffffffff);
+        let a = from_u256(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
         let a = bitnot(a);
         assert!(a.v0 == 0, 0);
-        assert!(a.v1 == 0xffffffffffffffff, 0);
-        assert!(a.v2 == 0xffffffffffffffff, 0);
-        assert!(a.v3 == 0xffffffffffffffff, 0);
+        assert!(a.v1 == 0, 0);
+        assert!(a.v2 == 0, 0);
+        assert!(a.v3 == 0, 0);
 
-        let a = from_u128(0x0f0f0f0f0f0f0f0fu128);
+        let a = from_u256(0x0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f);
         let a = bitnot(a);
         assert!(a.v0 == 0xf0f0f0f0f0f0f0f0, 0);
-        assert!(a.v1 == 0xffffffffffffffff, 0);
-        assert!(a.v2 == 0xffffffffffffffff, 0);
-        assert!(a.v3 == 0xffffffffffffffff, 0);
+        assert!(a.v1 == 0xf0f0f0f0f0f0f0f0, 0);
+        assert!(a.v2 == 0xf0f0f0f0f0f0f0f0, 0);
+        assert!(a.v3 == 0xf0f0f0f0f0f0f0f0, 0);
     }
 
     #[test]
