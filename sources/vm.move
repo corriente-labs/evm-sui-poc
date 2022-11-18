@@ -600,40 +600,40 @@ module vm::vm {
                 continue
             };
 
-            // TODO
-            // codesize
-            if (op == 0x38) {
-                pc = pc + 1;
-                continue
-            };
+            // // TODO
+            // // codesize
+            // if (op == 0x38) {
+            //     pc = pc + 1;
+            //     continue
+            // };
 
-            // TODO
-            // codecopy
-            if (op == 0x39) {
-                pc = pc + 1;
-                continue
-            };
+            // // TODO
+            // // codecopy
+            // if (op == 0x39) {
+            //     pc = pc + 1;
+            //     continue
+            // };
 
-            // TODO
-            // gasprice
-            if (op == 0x3a) {
-                pc = pc + 1;
-                continue
-            };
+            // // TODO
+            // // gasprice
+            // if (op == 0x3a) {
+            //     pc = pc + 1;
+            //     continue
+            // };
 
-            // TODO
-            // extcodesize
-            if (op == 0x3b) {
-                pc = pc + 1;
-                continue
-            };
+            // // TODO
+            // // extcodesize
+            // if (op == 0x3b) {
+            //     pc = pc + 1;
+            //     continue
+            // };
 
-            // TODO
-            // extcodecopy
-            if (op == 0x3c) {
-                pc = pc + 1;
-                continue
-            };
+            // // TODO
+            // // extcodecopy
+            // if (op == 0x3c) {
+            //     pc = pc + 1;
+            //     continue
+            // };
 
             // returndatasize
             if (op == 0x3d) {
@@ -645,61 +645,61 @@ module vm::vm {
                 continue
             };
 
-            // TODO
-            // returndatacopy
-            if (op == 0x3e) {
-                pc = pc + 1;
-                continue
-            };
+            // // TODO
+            // // returndatacopy
+            // if (op == 0x3e) {
+            //     pc = pc + 1;
+            //     continue
+            // };
 
-            // TODO
-            // extcodehash
-            if (op == 0x3f) {
-                pc = pc + 1;
-                continue
-            };
+            // // TODO
+            // // extcodehash
+            // if (op == 0x3f) {
+            //     pc = pc + 1;
+            //     continue
+            // };
 
-            // TODO
-            // coinbase
-            if (op == 0x41) {
-                pc = pc + 1;
-                continue
-            };
+            // // TODO
+            // // coinbase
+            // if (op == 0x41) {
+            //     pc = pc + 1;
+            //     continue
+            // };
 
-            // TODO
-            // timestamp
-            if (op == 0x42) {
-                pc = pc + 1;
-                continue
-            };
+            // // TODO
+            // // timestamp
+            // if (op == 0x42) {
+            //     pc = pc + 1;
+            //     continue
+            // };
 
-            // TODO
-            // number
-            if (op == 0x43) {
-                pc = pc + 1;
-                continue
-            };
+            // // TODO
+            // // number
+            // if (op == 0x43) {
+            //     pc = pc + 1;
+            //     continue
+            // };
 
-            // TODO
-            // prevrandao
-            if (op == 0x44) {
-                pc = pc + 1;
-                continue
-            };
+            // // TODO
+            // // prevrandao
+            // if (op == 0x44) {
+            //     pc = pc + 1;
+            //     continue
+            // };
 
-            // TODO
-            // gaslimit
-            if (op == 0x45) {
-                pc = pc + 1;
-                continue
-            };
+            // // TODO
+            // // gaslimit
+            // if (op == 0x45) {
+            //     pc = pc + 1;
+            //     continue
+            // };
 
-            // TODO
-            // chainid
-            if (op == 0x46) {
-                pc = pc + 1;
-                continue
-            };
+            // // TODO
+            // // chainid
+            // if (op == 0x46) {
+            //     pc = pc + 1;
+            //     continue
+            // };
 
             // selfbalance
             if (op == 0x47) {
@@ -713,12 +713,12 @@ module vm::vm {
                 continue
             };
 
-            // TODO
-            // basefee
-            if (op == 0x48) {
-                pc = pc + 1;
-                continue
-            };
+            // // TODO
+            // // basefee
+            // if (op == 0x48) {
+            //     pc = pc + 1;
+            //     continue
+            // };
 
             // pop
             if (op == 0x50) {
@@ -813,13 +813,14 @@ module vm::vm {
                 continue
             };
 
-            // msize
-            if (op == 0x59) {
-                let size = memory::msize(mem);
-                vector::push_back(stack, size);
-                pc = pc + 1;
-                continue
-            };
+            // TODO
+            // // msize
+            // if (op == 0x59) {
+            //     let size = memory::msize(mem);
+            //     vector::push_back(stack, size);
+            //     pc = pc + 1;
+            //     continue
+            // };
 
             // TODO
             // gas
@@ -890,59 +891,59 @@ module vm::vm {
                 continue
             };
 
-            // create
-            if (op == 0xf0) {
-                pc = pc + 1;
-                continue
-            };
+            // // create
+            // if (op == 0xf0) {
+            //     pc = pc + 1;
+            //     continue
+            // };
 
-            // call
-            if (op == 0xf1) {
-                pc = pc + 1;
-                continue
-            };
+            // // call
+            // if (op == 0xf1) {
+            //     pc = pc + 1;
+            //     continue
+            // };
 
-            // callcode
-            if (op == 0xf2) {
-                pc = pc + 1;
-                continue
-            };
+            // // callcode
+            // if (op == 0xf2) {
+            //     pc = pc + 1;
+            //     continue
+            // };
 
-            // return
-            if (op == 0xf3) {
-                pc = pc + 1;
-                continue
-            };
+            // // return
+            // if (op == 0xf3) {
+            //     pc = pc + 1;
+            //     continue
+            // };
 
-            // delegatecall
-            if (op == 0xf4) {
-                pc = pc + 1;
-                continue
-            };
+            // // delegatecall
+            // if (op == 0xf4) {
+            //     pc = pc + 1;
+            //     continue
+            // };
 
-            // create2
-            if (op == 0xf5) {
-                pc = pc + 1;
-                continue
-            };
+            // // create2
+            // if (op == 0xf5) {
+            //     pc = pc + 1;
+            //     continue
+            // };
 
-            // staticcall
-            if (op == 0xfa) {
-                pc = pc + 1;
-                continue
-            };
+            // // staticcall
+            // if (op == 0xfa) {
+            //     pc = pc + 1;
+            //     continue
+            // };
 
-            // invalid
-            if (op == 0xfe) {
-                pc = pc + 1;
-                continue
-            };
+            // // invalid
+            // if (op == 0xfe) {
+            //     pc = pc + 1;
+            //     continue
+            // };
 
-            // selfdestruct
-            if (op == 0xff) {
-                pc = pc + 1;
-                continue
-            };
+            // // selfdestruct
+            // if (op == 0xff) {
+            //     pc = pc + 1;
+            //     continue
+            // };
         };
 
         vector::empty()
