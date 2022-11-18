@@ -519,8 +519,9 @@ module vm::u256 {
             return ret
         };
 
-        let m = get(&x, i.v0 / 8);
-        let shifted = m >> (((8*(i.v0 % 8 - 1)) & 0xff) as u8);
+        let m = get(&x, 3 - i.v0 / 8);
+        let shifted = m >> (((8*(7 - i.v0 % 8)) & 0xff) as u8);
+        let shifted = shifted & 0xff;
 
         from_u64(shifted)
     }
@@ -1623,12 +1624,85 @@ module vm::u256 {
 
     #[test]
     fun test_not() {
-        assert!(false, 0);
+        let a = from_u128(0);
+        let a = bitnot(a);
+        assert!(a.v0 == 0xffffffffffffffff, 0);
+        assert!(a.v1 == 0xffffffffffffffff, 0);
+        assert!(a.v2 == 0xffffffffffffffff, 0);
+        assert!(a.v3 == 0xffffffffffffffff, 0);
+
+        let a = from_u128(0xffffffffffffffff);
+        let a = bitnot(a);
+        assert!(a.v0 == 0, 0);
+        assert!(a.v1 == 0xffffffffffffffff, 0);
+        assert!(a.v2 == 0xffffffffffffffff, 0);
+        assert!(a.v3 == 0xffffffffffffffff, 0);
+
+        let a = from_u128(0x0f0f0f0f0f0f0f0fu128);
+        let a = bitnot(a);
+        assert!(a.v0 == 0xf0f0f0f0f0f0f0f0, 0);
+        assert!(a.v1 == 0xffffffffffffffff, 0);
+        assert!(a.v2 == 0xffffffffffffffff, 0);
+        assert!(a.v3 == 0xffffffffffffffff, 0);
     }
 
     #[test]
     fun test_byte() {
-        assert!(false, 0);
+        let vec = create_vec(32);
+        let x = from_vec(&vec, 0, vector::length(&vec));
+
+        let index = 0;
+        while(index < 32) {
+            let a = byte(from_u64(index), x);
+
+            assert!(a.v0 == index, 0);
+            assert!(a.v1 == 0x0000000000000000, 0);
+            assert!(a.v2 == 0x0000000000000000, 0);
+            assert!(a.v3 == 0x0000000000000000, 0);
+
+            index = index + 1;
+        }
+    }
+
+    #[test]
+    fun test_byte_big_i() {
+        let x = zero();
+
+        let i = Big256 {
+            v0: 32,
+            v1: 0,
+            v2: 0,
+            v3: 0,
+        };
+        let a = byte(i, x);
+        assert!(is_zero(&a), 0);
+
+        let i = Big256 {
+            v0: 0,
+            v1: 32,
+            v2: 0,
+            v3: 0,
+        };
+        let a = byte(i, x);
+        assert!(is_zero(&a), 0);
+
+        let i = Big256 {
+            v0: 0,
+            v1: 0,
+            v2: 32,
+            v3: 0,
+        };
+        let a = byte(i, x);
+        assert!(is_zero(&a), 0);
+
+        let i = Big256 {
+            v0: 0,
+            v1: 0,
+            v2: 0,
+            v3: 32,
+        };
+        let a = byte(i, x);
+        assert!(is_zero(&a), 0);
     }
 
     #[test]
