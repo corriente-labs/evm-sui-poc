@@ -26,6 +26,8 @@ module vm::vm {
     const ENonceInvalid: u64 = 1;
     const EToInvalid: u64 = 2;
 
+    const CHAIN_ID: u64 = 12013522;
+
 
 
     // state wrapper
@@ -755,12 +757,13 @@ module vm::vm {
                 continue
             };
 
-            // // TODO
-            // // coinbase
-            // if (op == 0x41) {
-            //     pc = pc + 1;
-            //     continue
-            // };
+            // coinbase
+            if (op == 0x41) {
+                let val = u256::zero();
+                vector::push_back(stack, val);
+                pc = pc + 1;
+                continue
+            };
 
             // // TODO
             // // timestamp
@@ -790,12 +793,13 @@ module vm::vm {
             //     continue
             // };
 
-            // // TODO
-            // // chainid
-            // if (op == 0x46) {
-            //     pc = pc + 1;
-            //     continue
-            // };
+            // chainid
+            if (op == 0x46) {
+                let val = u256::from_u64(CHAIN_ID);
+                vector::push_back(stack, val);
+                pc = pc + 1;
+                continue
+            };
 
             // selfbalance
             if (op == 0x47) {
