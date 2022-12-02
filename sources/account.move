@@ -40,8 +40,8 @@ module vm::account {
     public fun nonce_increment(acct: &mut Account) {
         acct.nonce = acct.nonce + 1;
     }
-    public fun code(acct: &Account): vector<u8> {
-        acct.code
+    public fun code(acct: &Account): &vector<u8> {
+        &acct.code
     }
     public fun set_code(acct: &mut Account, code: vector<u8>) {
         acct.code = code;

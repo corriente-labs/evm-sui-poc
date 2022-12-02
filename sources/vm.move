@@ -587,7 +587,44 @@ module vm::vm {
                 memory::expand(mem, offset, size);
 
                 // copy calldata elements to memory
-                let pad_size = memory::copy_from_vec(mem, dest_offset, calldata, offset, size);
+                let src = calldata;
+                let pad_size = memory::copy_from_vec(mem, dest_offset, src, offset, size);
+
+                // fill with padding
+                let index = 0;
+                while (index < pad_size) {
+                    memory::push(mem, 0);
+                    index = index + 1;
+                };
+
+                pc = pc + 1;
+                continue
+            };
+
+            // codesize
+            if (op == 0x38) {
+                let size = vector::length(code);
+                vector::push_back(stack, u256::from_u64(size));
+                pc = pc + 1;
+                continue
+            };
+
+            // codecopy
+            if (op == 0x39) {
+                let dest_offset = vector::pop_back(stack);
+                let dest_offset = u256::as_u64(dest_offset);
+
+                let offset = vector::pop_back(stack);
+                let offset = u256::as_u64(offset);
+                
+                let size = vector::pop_back(stack);
+                let size = u256::as_u64(size);
+
+                memory::expand(mem, offset, size);
+
+                // copy code elements to memory
+                let src = code;
+                let pad_size = memory::copy_from_vec(mem, dest_offset, src, offset, size);
 
                 // fill with padding
                 let index = 0;
@@ -601,39 +638,65 @@ module vm::vm {
             };
 
             // // TODO
-            // // codesize
-            // if (op == 0x38) {
-            //     pc = pc + 1;
-            //     continue
-            // };
-
-            // // TODO
-            // // codecopy
-            // if (op == 0x39) {
-            //     pc = pc + 1;
-            //     continue
-            // };
-
-            // // TODO
             // // gasprice
             // if (op == 0x3a) {
             //     pc = pc + 1;
             //     continue
             // };
 
-            // // TODO
-            // // extcodesize
-            // if (op == 0x3b) {
-            //     pc = pc + 1;
-            //     continue
-            // };
+            // extcodesize
+            if (op == 0x3b) {
+                let addr = vector::pop_back(stack);
+                let addr = u160::from_u256(addr);
 
-            // // TODO
-            // // extcodecopy
-            // if (op == 0x3c) {
-            //     pc = pc + 1;
-            //     continue
-            // };
+                if(state::contains_account(state, addr)) {
+                    let acct = state::get_account(state, addr);
+                    let extcode = account::code(acct);
+                    let size = vector::length(extcode);
+                    vector::push_back(stack, u256::from_u64(size));
+                } else {
+                    vector::push_back(stack, u256::zero());
+                };
+
+                pc = pc + 1;
+                continue
+            };
+
+            // extcodecopy
+            if (op == 0x3c) {
+                let addr = vector::pop_back(stack);
+                let addr = u160::from_u256(addr);
+
+                let dest_offset = vector::pop_back(stack);
+                let dest_offset = u256::as_u64(dest_offset);
+
+                let offset = vector::pop_back(stack);
+                let offset = u256::as_u64(offset);
+                
+                let size = vector::pop_back(stack);
+                let size = u256::as_u64(size);
+
+                memory::expand(mem, offset, size);
+                
+                if(state::contains_account(state, addr)) {
+                    let acct = state::get_account(state, addr);
+                    let extcode = account::code(acct);
+
+                    // copy extcode elements to memory
+                    let src = extcode;
+                    let pad_size = memory::copy_from_vec(mem, dest_offset, src, offset, size);
+
+                    // fill with padding
+                    let index = 0;
+                    while (index < pad_size) {
+                        memory::push(mem, 0);
+                        index = index + 1;
+                    };
+                };
+
+                pc = pc + 1;
+                continue
+            };
 
             // returndatasize
             if (op == 0x3d) {
@@ -645,19 +708,52 @@ module vm::vm {
                 continue
             };
 
-            // // TODO
-            // // returndatacopy
-            // if (op == 0x3e) {
-            //     pc = pc + 1;
-            //     continue
-            // };
+            // returndatacopy
+            if (op == 0x3e) {
+                let dest_offset = vector::pop_back(stack);
+                let dest_offset = u256::as_u64(dest_offset);
 
-            // // TODO
-            // // extcodehash
-            // if (op == 0x3f) {
-            //     pc = pc + 1;
-            //     continue
-            // };
+                let offset = vector::pop_back(stack);
+                let offset = u256::as_u64(offset);
+                
+                let size = vector::pop_back(stack);
+                let size = u256::as_u64(size);
+
+                memory::expand(mem, offset, size);
+
+                // copy return data elements to memory
+                let src = ret_data;
+                let pad_size = memory::copy_from_vec(mem, dest_offset, src, offset, size);
+
+                // fill with padding
+                let index = 0;
+                while (index < pad_size) {
+                    memory::push(mem, 0);
+                    index = index + 1;
+                };
+
+                pc = pc + 1;
+                continue
+            };
+
+            // extcodehash
+            if (op == 0x3f) {
+                let addr = vector::pop_back(stack);
+                let addr = u160::from_u256(addr);
+
+                if(state::contains_account(state, addr)) {
+                    let acct = state::get_account(state, addr);
+                    let extcode = account::code(acct);
+                    let image = ecdsa::keccak256(extcode);
+                    let image = u256::from_vec(&image, 0, 32);
+                    vector::push_back(stack, image);
+                } else {
+                    vector::push_back(stack, u256::zero());
+                };
+
+                pc = pc + 1;
+                continue
+            };
 
             // // TODO
             // // coinbase
@@ -813,14 +909,13 @@ module vm::vm {
                 continue
             };
 
-            // TODO
-            // // msize
-            // if (op == 0x59) {
-            //     let size = memory::msize(mem);
-            //     vector::push_back(stack, size);
-            //     pc = pc + 1;
-            //     continue
-            // };
+            // msize
+            if (op == 0x59) {
+                let size = memory::msize(mem);
+                vector::push_back(stack, size);
+                pc = pc + 1;
+                continue
+            };
 
             // TODO
             // gas
