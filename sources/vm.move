@@ -25,6 +25,7 @@ module vm::vm {
     const EAmountInvalid: u64 = 0;
     const ENonceInvalid: u64 = 1;
     const EToInvalid: u64 = 2;
+    const EInsufficientBalance: u64 = 3;
 
     const CHAIN_ID: u64 = 12013522;
 
@@ -161,7 +162,7 @@ module vm::vm {
     fun call_inner(state: &mut State,
         origin: Big160,
         caller_addr: Big160,
-        to: Big160,
+        callee: Big160,
         value: Big256,
         code: &vector<u8>,
         calldata: &vector<u8>,
@@ -169,6 +170,7 @@ module vm::vm {
         mem: &mut Memory,
         ret_data: &mut vector<u8>,
         depth: &mut u64,
+        ctx: &mut TxContext,
     ): vector<u8> {
         let pc = 0u64;
 
@@ -498,7 +500,7 @@ module vm::vm {
 
             // address
             if (op == 0x30) {
-                vector::push_back(stack, u160::to_u256(to));
+                vector::push_back(stack, u160::to_u256(callee));
                 pc = pc + 1;
                 continue
             };
@@ -803,9 +805,7 @@ module vm::vm {
 
             // selfbalance
             if (op == 0x47) {
-                let addr = vector::pop_back(stack);
-                let addr = u160::from_u256(addr);
-                let acct = state::get_account(state, addr);
+                let acct = state::get_account(state, callee);
                 let balance = account::balance(acct);
                 let balance = u256::from_u64(balance);
                 vector::push_back(stack, balance);
@@ -858,7 +858,7 @@ module vm::vm {
             if (op == 0x54) {
                 let key = vector::pop_back(stack);
 
-                let acct = state::get_account(state, to);
+                let acct = state::get_account(state, callee);
                 let val = account::get_value(acct, key);
 
                 vector::push_back(stack, val);
@@ -871,7 +871,7 @@ module vm::vm {
                 let key = vector::pop_back(stack);
                 let val = vector::pop_back(stack);
                 
-                let acct = state::get_account_mut(state, to);
+                let acct = state::get_account_mut(state, callee);
                 account::set_value(acct, key, val);
 
                 pc = pc + 1;
@@ -996,11 +996,65 @@ module vm::vm {
             //     continue
             // };
 
-            // // call
-            // if (op == 0xf1) {
-            //     pc = pc + 1;
-            //     continue
-            // };
+            // call
+            if (op == 0xf1) {
+                let _gas = vector::pop_back<Big256>(stack); // ignored
+                
+                let to = vector::pop_back<Big256>(stack);
+                let to = u160::from_u256(to);
+
+                let value = vector::pop_back<Big256>(stack);
+                let value_u64 = u256::as_u64(value);
+
+                let args_offset = vector::pop_back<Big256>(stack);
+                let args_offset = u256::as_u64(args_offset);
+                let args_size = vector::pop_back<Big256>(stack);
+                let args_size = u256::as_u64(args_size);
+
+                let ret_offset = vector::pop_back<Big256>(stack);
+                let ret_offset = u256::as_u64(ret_offset);
+                let ret_size = vector::pop_back<Big256>(stack);
+                let ret_size = u256::as_u64(ret_size);
+
+                let next_caller = state::get_account_mut(state, callee);
+                let next_caller_balance = account::balance(next_caller);
+                assert!(next_caller_balance >= value_u64, EInsufficientBalance);
+                account::set_balance(next_caller, next_caller_balance - value_u64);
+
+                let next_callee = if (state::contains_account(state, to)) {
+                    state::get_account(state, to)
+                } else {
+                    let acct = account::empty(ctx, to, value_u64);
+                    state::add(state, to, acct);
+                    &acct
+                };
+                let called_code = account::code(next_callee);
+
+                let next_calldata = memory::expand_slice(mem, args_offset, args_size);
+                let next_stack = vector::empty<Big256>();
+                let next_memory = memory::empty();
+
+                *depth = *depth + 1;    // increment depth
+
+                let ret = call_inner(state,
+                    origin,
+                    callee,
+                    to,
+                    value,
+                    called_code,
+                    &next_calldata,
+                    &mut next_stack,
+                    &mut next_memory,
+                    ret_data,
+                    depth,
+                    ctx,
+                );
+
+                let ret_truncated = mem_slice(&mut ret, 0, (ret_size as u64));
+                mem_mut(memory, (ret_offset as u64), &ret_truncated);
+                pc = pc + 1;
+                continue
+            };
 
             // // callcode
             // if (op == 0xf2) {

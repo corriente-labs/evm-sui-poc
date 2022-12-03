@@ -1,4 +1,6 @@
 module vm::account {
+    use std::vector;
+
     use sui::table::{Self, Table};
     use sui::tx_context::TxContext;
 
@@ -18,6 +20,16 @@ module vm::account {
             balance,
             nonce,
             code,
+            storage: table::new(ctx),
+        }
+    }
+
+    public fun empty(ctx: &mut TxContext, addr: Big160, val: u64): Account {
+        Account {
+            addr,
+            balance: val,
+            nonce: 0,
+            code: vector::empty(),
             storage: table::new(ctx),
         }
     }
