@@ -168,13 +168,11 @@ module vm::vm {
         calldata: &vector<u8>,
         stack: &mut vector<Big256>,
         mem: &mut Memory,
-        ret_data: &mut vector<u8>,
         depth: &mut u64,
         ctx: &mut TxContext,
-    ): vector<u8> {
+    ): (bool, vector<u8>) {
         let pc = 0u64;
-
-        assert!(*depth < 1024, ECALL_DEPTH_OVERFLOW);
+        let ret_data = vector::empty<u8>();
 
         while(pc < vector::length(code)) {
             let op = *vector::borrow<u8>(code, pc);
@@ -704,7 +702,7 @@ module vm::vm {
 
             // returndatasize
             if (op == 0x3d) {
-                let size = vector::length(ret_data);
+                let size = vector::length(&ret_data);
                 let size = u256::from_u64(size);
 
                 vector::push_back(stack, size);
@@ -727,7 +725,7 @@ module vm::vm {
 
                 // copy return data elements to memory
                 let src = ret_data;
-                let pad_size = memory::copy_from_vec(mem, dest_offset, src, offset, size);
+                let pad_size = memory::copy_from_vec(mem, dest_offset, &mut src, offset, size);
 
                 // fill with padding
                 let index = 0;
@@ -1018,40 +1016,64 @@ module vm::vm {
 
                 let next_caller = state::get_account_mut(state, callee);
                 let next_caller_balance = account::balance(next_caller);
-                assert!(next_caller_balance >= value_u64, EInsufficientBalance);
-                account::set_balance(next_caller, next_caller_balance - value_u64);
-
-                let next_callee = if (state::contains_account(state, to)) {
-                    state::get_account(state, to)
-                } else {
-                    let acct = account::empty(ctx, to, value_u64);
-                    state::add(state, to, acct);
-                    &acct
+                if (next_caller_balance < value_u64) {
+                    vector::push_back(stack, u256::zero()); // push fail code
+                    pc = pc + 1;
+                    continue
                 };
-                let called_code = account::code(next_callee);
+
+                account::set_balance(next_caller, next_caller_balance - value_u64); // deduct value from caller balance
+
+                let called_code = if (state::contains_account(state, to)) {
+                    let next_callee = state::get_account_mut(state, to);
+                    account::add_balance(next_callee, value_u64);   // receive value
+                    *account::code(next_callee)
+                } else {
+                    let acct = account::empty(ctx, to, value_u64);  // receive value
+                    state::add(state, to, acct);
+                    vector::empty<u8>()
+                };
 
                 let next_calldata = memory::expand_slice(mem, args_offset, args_size);
                 let next_stack = vector::empty<Big256>();
                 let next_memory = memory::empty();
 
                 *depth = *depth + 1;    // increment depth
+                if (*depth == 1024) {
+                    vector::push_back(stack, u256::zero()); // push fail code
+                    pc = pc + 1;
+                    continue
+                };
 
-                let ret = call_inner(state,
+                let (success, ret) = call_inner(state,
                     origin,
                     callee,
                     to,
                     value,
-                    called_code,
+                    &called_code,
                     &next_calldata,
                     &mut next_stack,
                     &mut next_memory,
-                    ret_data,
                     depth,
                     ctx,
                 );
 
-                let ret_truncated = mem_slice(&mut ret, 0, (ret_size as u64));
-                mem_mut(memory, (ret_offset as u64), &ret_truncated);
+                let ret_code = if (success) {
+                    u256::one() // success code
+                } else {
+                    u256::zero() // fail code
+                };
+                vector::push_back(stack, ret_code);   
+
+                let pad_size = memory::copy_from_vec(mem, ret_offset, &ret, 0, ret_size);
+                let index = 0;
+                while (index < pad_size) { // fill with padding
+                    memory::push(mem, 0);
+                    index = index + 1;
+                };
+
+                ret_data = ret; // update return_data
+
                 pc = pc + 1;
                 continue
             };
@@ -1062,11 +1084,15 @@ module vm::vm {
             //     continue
             // };
 
-            // // return
-            // if (op == 0xf3) {
-            //     pc = pc + 1;
-            //     continue
-            // };
+            // return
+            if (op == 0xf3) {
+                let offset = vector::pop_back<Big256>(stack);
+                let offset = u256::as_u64(offset);
+                let size = vector::pop_back<Big256>(stack);
+                let size = u256::as_u64(size);
+                let ret = memory::expand_slice(mem, offset, size);
+                return (true, ret)
+            };
 
             // // delegatecall
             // if (op == 0xf4) {
@@ -1086,11 +1112,25 @@ module vm::vm {
             //     continue
             // };
 
-            // // invalid
-            // if (op == 0xfe) {
-            //     pc = pc + 1;
-            //     continue
-            // };
+            // revert
+            if (op == 0xfd) {
+                let offset = vector::pop_back<Big256>(stack);
+                let offset = u256::as_u64(offset);
+                let size = vector::pop_back<Big256>(stack);
+                let size = u256::as_u64(size);
+                let ret = memory::expand_slice(mem, offset, size);
+
+                // TODO
+                // state revertion
+
+                return (false, ret)
+            };
+
+            // invalid
+            if (op == 0xfe) {
+                let ret = memory::expand_slice(mem, 0, 0);
+                return (false, ret)
+            };
 
             // // selfdestruct
             // if (op == 0xff) {
@@ -1099,7 +1139,7 @@ module vm::vm {
             // };
         };
 
-        vector::empty()
+        (true, vector::empty())
     }
 }
 

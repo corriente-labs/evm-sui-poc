@@ -43,6 +43,9 @@ module vm::account {
     public fun set_balance(acct: &mut Account, balance: u64) {
         acct.balance = balance;
     }
+    public fun add_balance(acct: &mut Account, amount: u64) {
+        acct.balance = acct.balance + amount;
+    }
     public fun nonce(acct: &Account): u128 {
         acct.nonce
     }
