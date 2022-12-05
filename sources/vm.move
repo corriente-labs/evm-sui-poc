@@ -152,13 +152,18 @@ module vm::vm {
         })
     }
 
-    public fun transfer(_state: &mut StateV1, nonce: u128, from: Big160, to: Big160, amount: u64, ctx: &mut TxContext) {
+    // transfer between EVM account
+    public entry fun transfer(_state: &mut StateV1, nonce: u128, from: Big160, to: Big160, amount: u64, ctx: &mut TxContext) {
         let state = state_mut(_state);
 
         let acct = state::get_account_mut(state, from);
         let current_nonce = account::nonce(acct);
 
         assert!(current_nonce == nonce, ENonceInvalid);
+
+        // TODO: after MVP
+        // for contract execution
+        // call_inner();
 
         account::nonce_increment(acct);
         state::withdraw(state, from, amount);
