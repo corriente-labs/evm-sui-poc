@@ -102,7 +102,21 @@ module vm::u256 {
         v5: u64,
         v6: u64,
         v7: u64,
-    }    
+    }
+
+    public fun new(v0: u64, v1: u64, v2: u64, v3: u64): Big256 {
+        Big256 {
+            v0,
+            v1,
+            v2,
+            v3,
+        }
+    }
+
+    /// Convert `Big256` to `u128` value
+    public fun as_u256(a: Big256): u256 {
+        ((a.v3 as u256) << 192) + ((a.v2 as u256) << 128) + ((a.v1 as u256) << 64) + (a.v0 as u256)
+    }
 
     /// Convert `Big256` to `u128` value if possible (otherwise it aborts).
     public fun as_u128(a: Big256): u128 {
@@ -116,29 +130,48 @@ module vm::u256 {
         a.v0
     }
 
-    /// Compares two `Big256` numbers.
-    public fun compare(a: &Big256, b: &Big256): u8 {
-        let i = WORDS;
-        while (i > 0) {
-            i = i - 1;
-            let a1 = get(a, i);
-            let b1 = get(b, i);
-
-            if (a1 != b1) {
-                if (a1 < b1) {
-                    return LESS_THAN
-                } else {
-                    return GREATER_THAN
-                }
-            }
-        };
-
-        EQUAL
+    /// Convert `Big256` to `u64` value if possible (otherwise it aborts).
+    public fun as_u8(a: Big256): u8 {
+        assert!(a.v1 == 0 && a.v2 == 0 && a.v3 == 0, ECAST_OVERFLOW);
+        (a.v0 as u8)
     }
 
-    /// Returns a `Big256` from `u64` value.
-    public fun from_u64(val: u64): Big256 {
-        from_u128((val as u128))
+    // as least significant u8
+    public fun as_ls_u8(a: Big256): u8 {
+        ((a.v0 & 0xff) as u8)
+    }
+
+    /// less than 256
+    public fun lt_256(a: Big256): bool {
+        a.v1 == 0 && a.v2 == 0 && a.v3 == 0 && a.v0 < 256
+    }
+
+    /// Compares two `Big256` numbers.
+    public fun compare(a: &Big256, b: &Big256): u8 {
+        let a = as_u256(*a);
+        let b = as_u256(*b);
+        if (a < b) {
+            LESS_THAN
+        } else if (a > b) {
+            GREATER_THAN
+        } else {
+            EQUAL
+        }
+    }
+
+    /// Is the given Big256 zero?
+    public fun is_zero(n: &Big256): bool {
+        n.v0 == 0 && n.v1 == 0 && n.v2 == 0 && n.v3 == 0
+    }
+
+    /// Returns a `Big256` from `u256` value.
+    public fun from_u256(val: u256): Big256 {
+        Big256 {
+            v0: ((val & 0xffffffffffffffff) as u64),
+            v1: (((val >> 64) & 0xffffffffffffffff) as u64),
+            v2: (((val >> 128) & 0xffffffffffffffff) as u64),
+            v3: (((val >> 192) & 0xffffffffffffffff) as u64),
+        }
     }
 
     /// Returns a `Big256` from `u128` value.
@@ -148,6 +181,26 @@ module vm::u256 {
         Big256 {
             v0: a1,
             v1: a2,
+            v2: 0,
+            v3: 0,
+        }
+    }
+
+    /// Returns a `Big256` from `u64` value.
+    public fun from_u64(val: u64): Big256 {
+        Big256 {
+            v0: val,
+            v1: 0,
+            v2: 0,
+            v3: 0,
+        }
+    }
+
+    /// Returns a `Big256` from `u8` value.
+    public fun from_u8(val: u8): Big256 {
+        Big256 {
+            v0: (val as u64),
+            v1: 0,
             v2: 0,
             v3: 0,
         }
@@ -369,10 +422,14 @@ module vm::u256 {
     public fun div(a: Big256, b: Big256): Big256 {
         let ret = zero();
 
+        if (is_zero(&b)) {
+            // Immidiatelly return.
+            return ret
+        };
+
         let a_bits = bits(&a);
         let b_bits = bits(&b);
 
-        assert!(b_bits != 0, EDIV_BY_ZERO); // DIVIDE BY ZERO.
         if (a_bits < b_bits) {
             // Immidiatelly return.
             return ret
@@ -403,105 +460,83 @@ module vm::u256 {
         ret
     }
 
+    /// Binary mod `a` by `b`.
+    public fun mod(a: Big256, b: Big256): Big256 {
+        let a = as_u256(a);
+        let b = as_u256(b);
+        let c = a % b;
+        from_u256(c)
+    }
+
     /// Binary xor `a` by `b`.
-    fun bitxor(a: Big256, b: Big256): Big256 {
-        let ret = zero();
-
-        let i = 0;
-        while (i < WORDS) {
-            let a1 = get(&a, i);
-            let b1 = get(&b, i);
-            put(&mut ret, i, a1 ^ b1);
-
-            i = i + 1;
-        };
-
-        ret
+    public fun bitxor(a: Big256, b: Big256): Big256 {
+        let a = as_u256(a);
+        let b = as_u256(b);
+        let c = a ^ b;
+        from_u256(c)
     }
 
     /// Binary and `a` by `b`.
-    fun bitand(a: Big256, b: Big256): Big256 {
-        let ret = zero();
-
-        let i = 0;
-        while (i < WORDS) {
-            let a1 = get(&a, i);
-            let b1 = get(&b, i);
-            put(&mut ret, i, a1 & b1);
-
-            i = i + 1;
-        };
-
-        ret
+    public fun bitand(a: Big256, b: Big256): Big256 {
+        let a = as_u256(a);
+        let b = as_u256(b);
+        let c = a & b;
+        from_u256(c)
     }
 
     /// Binary or `a` by `b`.
-    fun bitor(a: Big256, b: Big256): Big256 {
+    public fun bitor(a: Big256, b: Big256): Big256 {
+        let a = as_u256(a);
+        let b = as_u256(b);
+        let c = a | b;
+        from_u256(c)
+    }
+
+    /// Binary not `a`.
+    public fun bitnot(a: Big256): Big256 {
+        let a = as_u256(a);
+        let b = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
+        let c = a ^ b;
+        from_u256(c)
+    }
+
+    /// Binary not `a`.
+    public fun byte(i: Big256, x: Big256): Big256 {
         let ret = zero();
 
-        let i = 0;
-        while (i < WORDS) {
-            let a1 = get(&a, i);
-            let b1 = get(&b, i);
-            put(&mut ret, i, a1 | b1);
-
-            i = i + 1;
+        if (i.v0 > 31 || i.v1 > 0 || i.v2 > 0 || i.v3 > 0) {
+            return ret
         };
 
-        ret
+        let m = get(&x, 3 - i.v0 / 8);
+        let shifted = m >> (((8*(7 - i.v0 % 8)) & 0xff) as u8);
+        let shifted = shifted & 0xff;
+
+        from_u64(shifted)
     }
 
     /// Shift right `a`  by `shift`.
     public fun shr(a: Big256, shift: u8): Big256 {
-        let ret = zero();
-
-        let word_shift = (shift as u64) / 64;
-        let bit_shift = (shift as u64) % 64;
-
-        let i = word_shift;
-        while (i < WORDS) {
-            let m = get(&a, i) >> (bit_shift as u8);
-            put(&mut ret, i - word_shift, m);
-            i = i + 1;
-        };
-
-        if (bit_shift > 0) {
-            let j = word_shift + 1;
-            while (j < WORDS) {
-                let m = get(&ret, j - word_shift - 1) + (get(&a, j) << (64 - (bit_shift as u8)));
-                put(&mut ret, j - word_shift - 1, m);
-                j = j + 1;
-            };
-        };
-
-        ret
+        let a = as_u256(a);
+        let c = a >> shift;
+        from_u256(c)
     }
 
     /// Shift left `a` by `shift`.
     public fun shl(a: Big256, shift: u8): Big256 {
-        let ret = zero();
+        let a = as_u256(a);
+        let c = a << shift;
+        from_u256(c)
+    }
 
-        let word_shift = (shift as u64) / 64;
-        let bit_shift = (shift as u64) % 64;
-
-        let i = word_shift;
-        while (i < WORDS) {
-            let m = get(&a, i - word_shift) << (bit_shift as u8);
-            put(&mut ret, i, m);
-            i = i + 1;
-        };
-
-        if (bit_shift > 0) {
-            let j = word_shift + 1;
-
-            while (j < WORDS) {
-                let m = get(&ret, j) + (get(&a, j - 1 - word_shift) >> (64 - (bit_shift as u8)));
-                put(&mut ret, j, m);
-                j = j + 1;
-            };
-        };
-
-        ret
+    /// Returns `Big256` equals to one.
+    public fun one(): Big256 {
+        Big256 {
+            v0: 1,
+            v1: 0,
+            v2: 0,
+            v3: 0,
+        }
     }
 
     /// Returns `Big256` equals to zero.
@@ -511,6 +546,15 @@ module vm::u256 {
             v1: 0,
             v2: 0,
             v3: 0,
+        }
+    }
+
+    public fun max(): Big256 {
+        Big256 {
+            v0: 0xffffffffffffffff,
+            v1: 0xffffffffffffffff,
+            v2: 0xffffffffffffffff,
+            v3: 0xffffffffffffffff,
         }
     }
 
@@ -1491,10 +1535,10 @@ module vm::u256 {
         let c = bitor(a, b);
         assert!(as_u128(c) == 1, 0);
 
-        let a = from_u128(0x0f0f0f0f0f0f0f0fu128);
-        let b = from_u128(0xf0f0f0f0f0f0f0f0u128);
+        let a = from_u256(0x0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f);
+        let b = from_u256(0xf0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0);
         let c = bitor(a, b);
-        assert!(as_u128(c) == 0xffffffffffffffffu128, 1);
+        assert!(as_u256(c) == 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff, 1);
     }
 
     #[test]
@@ -1502,17 +1546,17 @@ module vm::u256 {
         let a = from_u128(0);
         let b = from_u128(1);
         let c = bitand(a, b);
-        assert!(as_u128(c) == 0, 0);
+        assert!(as_u256(c) == 0, 0);
 
-        let a = from_u128(0x0f0f0f0f0f0f0f0fu128);
-        let b = from_u128(0xf0f0f0f0f0f0f0f0u128);
+        let a = from_u256(0x0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f);
+        let b = from_u256(0xf0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0);
         let c = bitand(a, b);
-        assert!(as_u128(c) == 0, 1);
+        assert!(as_u256(c) == 0, 1);
 
-        let a = from_u128(0x0f0f0f0f0f0f0f0fu128);
-        let b = from_u128(0x0f0f0f0f0f0f0f0fu128);
+        let a = from_u256(0x0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f);
+        let b = from_u256(0x0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f);
         let c = bitand(a, b);
-        assert!(as_u128(c) == 0x0f0f0f0f0f0f0f0fu128, 1);
+        assert!(as_u256(c) == 0x0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f, 1);
     }
 
     #[test]
@@ -1522,10 +1566,98 @@ module vm::u256 {
         let c = bitxor(a, b);
         assert!(as_u128(c) == 1, 0);
 
-        let a = from_u128(0x0f0f0f0f0f0f0f0fu128);
-        let b = from_u128(0xf0f0f0f0f0f0f0f0u128);
+        let a = from_u256(0x0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f);
+        let b = from_u256(0xf0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0);
         let c = bitxor(a, b);
-        assert!(as_u128(c) == 0xffffffffffffffffu128, 1);
+        assert!(as_u256(c) == 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff, 1);
+
+        let a = from_u256(0xff0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f00);
+        let b = from_u256(0xfff0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f000);
+        let c = bitxor(a, b);
+        assert!(as_u256(c) == 0x00ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00, 1);
+    }
+
+    #[test]
+    fun test_not() {
+        let a = from_u256(0);
+        let a = bitnot(a);
+        assert!(a.v0 == 0xffffffffffffffff, 0);
+        assert!(a.v1 == 0xffffffffffffffff, 0);
+        assert!(a.v2 == 0xffffffffffffffff, 0);
+        assert!(a.v3 == 0xffffffffffffffff, 0);
+
+        let a = from_u256(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
+        let a = bitnot(a);
+        assert!(a.v0 == 0, 0);
+        assert!(a.v1 == 0, 0);
+        assert!(a.v2 == 0, 0);
+        assert!(a.v3 == 0, 0);
+
+        let a = from_u256(0x0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f);
+        let a = bitnot(a);
+        assert!(a.v0 == 0xf0f0f0f0f0f0f0f0, 0);
+        assert!(a.v1 == 0xf0f0f0f0f0f0f0f0, 0);
+        assert!(a.v2 == 0xf0f0f0f0f0f0f0f0, 0);
+        assert!(a.v3 == 0xf0f0f0f0f0f0f0f0, 0);
+    }
+
+    #[test]
+    fun test_byte() {
+        let vec = create_vec(32);
+        let x = from_vec(&vec, 0, vector::length(&vec));
+
+        let index = 0;
+        while(index < 32) {
+            let a = byte(from_u64(index), x);
+
+            assert!(a.v0 == index, 0);
+            assert!(a.v1 == 0x0000000000000000, 0);
+            assert!(a.v2 == 0x0000000000000000, 0);
+            assert!(a.v3 == 0x0000000000000000, 0);
+
+            index = index + 1;
+        }
+    }
+
+    #[test]
+    fun test_byte_big_i() {
+        let x = zero();
+
+        let i = Big256 {
+            v0: 32,
+            v1: 0,
+            v2: 0,
+            v3: 0,
+        };
+        let a = byte(i, x);
+        assert!(is_zero(&a), 0);
+
+        let i = Big256 {
+            v0: 0,
+            v1: 32,
+            v2: 0,
+            v3: 0,
+        };
+        let a = byte(i, x);
+        assert!(is_zero(&a), 0);
+
+        let i = Big256 {
+            v0: 0,
+            v1: 0,
+            v2: 32,
+            v3: 0,
+        };
+        let a = byte(i, x);
+        assert!(is_zero(&a), 0);
+
+        let i = Big256 {
+            v0: 0,
+            v1: 0,
+            v2: 0,
+            v3: 32,
+        };
+        let a = byte(i, x);
+        assert!(is_zero(&a), 0);
     }
 
     #[test]
@@ -1644,10 +1776,17 @@ module vm::u256 {
     }
 
     #[test]
-    #[expected_failure(abort_code=3)]
     fun test_div_by_zero() {
-        let a = from_u128(1);
-        let _z = div(a, from_u128(0));
+        let a = from_u128(100);
+        let b = from_u128(0);
+        let d = div(a, b);
+
+        assert!(as_u128(d) == 0, 0);
+    }
+
+    #[test]
+    fun test_mod() {
+        assert!(false, 0);
     }
 
     #[test]
