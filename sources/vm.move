@@ -29,17 +29,26 @@ module vm::vm {
 
     const CHAIN_ID: u64 = 12013522;
 
-
+    #[test_only]
+    friend vm::vm_test;
 
     // state wrapper
     struct StateV1 has key, store {
         id: UID,
         state: State,
     }
+    public fun create_state(ctx: &mut TxContext): StateV1 {
+        let state = StateV1 {
+            id: object::new(ctx),
+            state: state::create(ctx),
+        };
+        state
+    }
+
     public fun state(state: &StateV1): &State {
         &state.state
     }
-    fun state_mut(state: &mut StateV1): &mut State {
+    public(friend) fun state_mut(state: &mut StateV1): &mut State {
         &mut state.state
     }
 
@@ -159,7 +168,7 @@ module vm::vm {
     const ECALL_DEPTH_OVERFLOW: u64 = 1001;
     const ECALL_INVALID_JUMP: u64 = 1002;
 
-    fun call_inner(state: &mut State,
+    public(friend) fun call_inner(state: &mut State,
         origin: Big160,
         caller_addr: Big160,
         callee: Big160,
@@ -934,10 +943,10 @@ module vm::vm {
 
             // push-n
             if (op >= 0x60 && op <= 0x7f) {
-                let len = (op as u64) - 0x60;
-                let val = u256::from_vec(code, pc, len);
+                let len = (op as u64) - 0x60 + 1;
+                let val = u256::from_vec(code, pc + 1, len);
                 vector::push_back(stack, val);
-                pc = pc + 2 + len;
+                pc = pc + 1 + len;
                 continue
             };
 
@@ -1144,7 +1153,7 @@ module vm::vm {
 }
 
 #[test_only]
-module vm::test_vm {
+module vm::vm_gateway_test {
     use sui::sui::{SUI, Self};
     use sui::coin::{Coin, Self, mint_for_testing as mint};
     use sui::test_scenario::{Self as test, next_tx, ctx};
