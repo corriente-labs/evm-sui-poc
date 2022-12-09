@@ -1,5 +1,14 @@
 # EVM on Sui
-For Sui version 0.13.2: [7fff531f90d912d2d2d77c5eca2e98c3c23ccdcf](https://github.com/MystenLabs/sui/releases/tag/devnet-0.13.2)
+
+## Doc
+- [Proxy](doc/proxy.md)
+- [EVM](doc/vm.md)
+
+## When bumping up Sui Version
+```
+export SUI_COMMIT_HASH <YOUR_SUI_CLI_VERSION_HASH>
+make version
+```
 
 ## Test on Local network
 https://docs.sui.io/devnet/build/cli-client#genesis
